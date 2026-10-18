@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "source": "User-uploaded Playwright HTML report; embedded report.json inspected",
+  "runId": "39067041186",
+  "testedCommit": "c59da57fbbbec8ac1baeebae3e747b0dff100884",
+  "outcome": "passed",
+  "counts": {"passed": 18, "failed": 0, "flaky": 0, "skipped": 2},
+  "browsers": {
+    "chromium-desktop": {"passed": 9, "failed": 0, "flaky": 0, "skipped": 1},
+    "webkit-mobile": {"passed": 9, "failed": 0, "flaky": 0, "skipped": 1}
+  },
+  "knownSkippedCheck": "Chart zoom/date-selection preservation, once per browser",
+  "durationMs": 23217.619,
+  "note": "Historical baseline, not the outcome of subsequent runs or evidence of live provider/notification testing."
+}

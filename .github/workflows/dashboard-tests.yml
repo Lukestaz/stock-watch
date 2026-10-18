@@ -11,7 +11,7 @@ permissions:
   contents: read
 concurrency:
   group: dashboard-tests-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   browser-tests:
     runs-on: ubuntu-latest
@@ -37,7 +37,17 @@ jobs:
       - name: Run isolated browser tests
         env:
           CI: 'true'
-        run: npm test
+          PLAYWRIGHT_JSON_OUTPUT_NAME: results.json
+          PLAYWRIGHT_HTML_OPEN: never
+        run: npm test -- --reporter=list,html,json
+      - name: Upload machine-readable results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-machine-results
+          path: tests/dashboard/results.json
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload synthetic-data test report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
@@ -48,3 +58,68 @@ jobs:
             tests/dashboard/test-results/
           retention-days: 7
           if-no-files-found: ignore
+  publish-summary:
+    needs: browser-tests
+    if: >-
+      always() && !cancelled() && github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    concurrency:
+      group: dashboard-results-publisher
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download this run's JSON only
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: dashboard-machine-results
+          path: ${{ runner.temp }}/dashboard-machine-results
+      - name: Build bounded summary even when tests failed
+        env:
+          TEST_JOB_RESULT: ${{ needs.browser-tests.result }}
+          JSON_FILE: ${{ runner.temp }}/dashboard-machine-results/results.json
+          SUMMARY_FILE: ${{ runner.temp }}/dashboard-summary.json
+        run: node tests/dashboard/summarize-results.mjs
+      - name: Save summary on results-only branch
+        uses: actions/github-script@v7
+        env:
+          SUMMARY_FILE: ${{ runner.temp }}/dashboard-summary.json
+        with:
+          script: |
+            const fs = require('node:fs');
+            const text = fs.readFileSync(process.env.SUMMARY_FILE, 'utf8');
+            const summary = JSON.parse(text);
+            const {owner, repo} = context.repo;
+            let head = null, baseTree;
+            try {
+              head = (await github.rest.git.getRef({owner, repo, ref:'heads/ci-results'})).data.object.sha;
+              baseTree = (await github.rest.git.getCommit({owner, repo, commit_sha:head})).data.tree.sha;
+            } catch (e) { if (e.status !== 404) throw e; }
+            let replaceLatest = true;
+            if (head) {
+              try {
+                const oldFile = (await github.rest.repos.getContent({owner, repo, path:'dashboard/latest.json', ref:head})).data;
+                const old = JSON.parse(Buffer.from(oldFile.content, 'base64').toString('utf8'));
+                replaceLatest = Number(summary.runNumber) > Number(old.runNumber) ||
+                  (Number(summary.runNumber) === Number(old.runNumber) && Number(summary.runAttempt) >= Number(old.runAttempt));
+              } catch (e) { if (e.status !== 404) throw e; }
+            }
+            const treeEntries = [{path:`dashboard/runs/${summary.runId}-${summary.runAttempt}.json`, mode:'100644', type:'blob', content:text}];
+            if (replaceLatest) treeEntries.push({path:'dashboard/latest.json', mode:'100644', type:'blob', content:text});
+            const tree = (await github.rest.git.createTree({owner, repo, ...(baseTree ? {base_tree:baseTree} : {}), tree:treeEntries})).data;
+            const commit = (await github.rest.git.createCommit({owner, repo, message:`Dashboard CI ${summary.runId}/${summary.runAttempt}: ${summary.outcome}`, tree:tree.sha, parents:head ? [head] : []})).data;
+            if (head) await github.rest.git.updateRef({owner, repo, ref:'heads/ci-results', sha:commit.sha, force:false});
+            else await github.rest.git.createRef({owner, repo, ref:'refs/heads/ci-results', sha:commit.sha});
+            core.info(`Saved dashboard summary on ci-results at ${commit.sha}`);
