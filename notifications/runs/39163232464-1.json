@@ -11,5 +11,11 @@
   "outcome": "accepted",
   "errorCategory": null,
   "sendAttempted": true,
-  "receipt": "unverified"
+  "receipt": "confirmed",
+  "receiptConfirmation": {
+    "source": "user_confirmation_in_conversation",
+    "reportedAt": "2026-10-19T09:26:00+13:00",
+    "evidence": "User confirmed both workflow success and message arrival for email and WhatsApp.",
+    "scope": "Receipt of this manual test message only; not verification of scheduled price-threshold alerts."
+  }
 }
