@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "workflow": "Dashboard regression tests",
+  "sourceBranch": "main",
+  "testedCommit": "e7b19115a0d458604540d2fcd4baf0d0c348f30a",
+  "runId": "39159923215",
+  "runNumber": "2",
+  "runAttempt": "1",
+  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/39159923215",
+  "generatedAt": "2026-10-18T19:43:06.075Z",
+  "jobResult": "success",
+  "outcome": "passed",
+  "reportState": "available",
+  "reportError": null,
+  "counts": {
+    "passed": 18,
+    "failed": 0,
+    "flaky": 0,
+    "skipped": 2
+  },
+  "browsers": {
+    "chromium-desktop": {
+      "passed": 9,
+      "failed": 0,
+      "flaky": 0,
+      "skipped": 1
+    },
+    "webkit-mobile": {
+      "passed": 9,
+      "failed": 0,
+      "flaky": 0,
+      "skipped": 1
+    }
+  },
+  "failures": [],
+  "skips": [
+    {
+      "browser": "chromium-desktop",
+      "title": "watchlist.spec.mjs > chart zoom and date selection survive data refresh"
+    },
+    {
+      "browser": "webkit-mobile",
+      "title": "watchlist.spec.mjs > chart zoom and date selection survive data refresh"
+    }
+  ],
+  "errors": []
+}
