@@ -1,0 +1,129 @@
+name: Notification checks and manual test
+on:
+  push:
+    branches: [main]
+    paths: ['scripts/notifications.py', 'scripts/notification_test.py', 'scripts/test_notifications_unit.py', 'scripts/monitor.py', '.github/workflows/notification-test.yml']
+  pull_request:
+    branches: [main]
+    paths: ['scripts/notifications.py', 'scripts/notification_test.py', 'scripts/test_notifications_unit.py', 'scripts/monitor.py', '.github/workflows/notification-test.yml']
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Channel to test against its existing configured destination
+        type: choice
+        options: [email, whatsapp]
+        required: true
+      confirm_send:
+        description: I verified the destination privately and approve one real TEST message
+        type: boolean
+        required: true
+        default: false
+permissions:
+  contents: read
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Mocked transport and test-mode checks; no secrets
+        run: |
+          python -m unittest discover -s scripts -p test_notifications_unit.py -v
+          python -m py_compile scripts/monitor.py
+  send-test:
+    needs: unit-tests
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: notification-manual-send
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: At most one test submission; no automatic retry
+        env:
+          CHANNEL: ${{ inputs.channel }}
+          CONFIRM_SEND: ${{ inputs.confirm_send }}
+          GMAIL_USER: ${{ inputs.channel == 'email' && secrets.GMAIL_USER || '' }}
+          GMAIL_APP_PASSWORD: ${{ inputs.channel == 'email' && secrets.GMAIL_APP_PASSWORD || '' }}
+          ALERT_TO_EMAIL: ${{ inputs.channel == 'email' && secrets.ALERT_TO_EMAIL || '' }}
+          WHATSAPP_PHONE: ${{ inputs.channel == 'whatsapp' && secrets.WHATSAPP_PHONE || '' }}
+          WHATSAPP_API_KEY: ${{ inputs.channel == 'whatsapp' && secrets.WHATSAPP_API_KEY || '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARGS=()
+          if [ "$CONFIRM_SEND" = true ]; then ARGS+=(--confirm-send); fi
+          python scripts/notification_test.py --channel "$CHANNEL" --output "$RUNNER_TEMP/notification-test.json" "${ARGS[@]}"
+      - name: Upload sanitised result only
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: notification-test-result
+          path: ${{ runner.temp }}/notification-test.json
+          if-no-files-found: warn
+          retention-days: 7
+  publish-summary:
+    needs: [unit-tests, send-test]
+    if: >-
+      always() && !cancelled() && github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    concurrency:
+      group: dashboard-results-publisher
+      cancel-in-progress: false
+    steps:
+      - name: Download sanitised result
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: notification-test-result
+          path: ${{ runner.temp }}/notification-result
+      - name: Publish safe outcome without executing artifacts
+        uses: actions/github-script@v7
+        env:
+          RESULT_FILE: ${{ runner.temp }}/notification-result/notification-test.json
+          CHANNEL: ${{ inputs.channel }}
+          SEND_JOB_RESULT: ${{ needs.send-test.result }}
+        with:
+          script: |
+            const fs = require('node:fs');
+            const channel = process.env.CHANNEL;
+            if (!['email','whatsapp'].includes(channel)) throw Error('Invalid channel');
+            let raw = null;
+            try {
+              if (fs.statSync(process.env.RESULT_FILE).size > 16000) throw Error('Oversized result');
+              raw = JSON.parse(fs.readFileSync(process.env.RESULT_FILE,'utf8'));
+            } catch { raw = null; }
+            const allowed = ['accepted','failed','not_sent','outcome_unknown'];
+            const categories = ['send_not_confirmed','missing_configuration','partial_recipient_rejection','smtp_rejected','smtp_transport_error','gateway_transport_error','gateway_rejected','gateway_response_unrecognised','unexpected_sender_error'];
+            const valid = raw && raw.channel === channel && raw.runId === String(context.runId) && raw.runAttempt === process.env.GITHUB_RUN_ATTEMPT && allowed.includes(raw.outcome);
+            const outcome = valid ? raw.outcome : process.env.SEND_JOB_RESULT === 'skipped' ? 'not_sent' : 'outcome_unknown';
+            const summary = {schemaVersion:1,channel,testId:`${context.runId}/${process.env.GITHUB_RUN_ATTEMPT}`,runId:String(context.runId),runAttempt:process.env.GITHUB_RUN_ATTEMPT,testedCommit:context.sha,generatedAt:new Date().toISOString(),runUrl:`${process.env.GITHUB_SERVER_URL}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,jobResult:process.env.SEND_JOB_RESULT,outcome,errorCategory:valid ? (categories.includes(raw.errorCategory) ? raw.errorCategory : null) : 'result_unavailable',sendAttempted:valid ? raw.sendAttempted === true : null,receipt:'unverified'};
+            const content = JSON.stringify(summary,null,2)+'\n';
+            const {owner,repo} = context.repo;
+            let head = null, baseTree;
+            try {
+              head = (await github.rest.git.getRef({owner,repo,ref:'heads/ci-results'})).data.object.sha;
+              baseTree = (await github.rest.git.getCommit({owner,repo,commit_sha:head})).data.tree.sha;
+            } catch (e) { if(e.status !== 404) throw e; }
+            const entries = [{path:`notifications/${channel}/latest.json`,mode:'100644',type:'blob',content},{path:`notifications/runs/${context.runId}-${process.env.GITHUB_RUN_ATTEMPT}.json`,mode:'100644',type:'blob',content}];
+            const tree = (await github.rest.git.createTree({owner,repo,...(baseTree ? {base_tree:baseTree} : {}),tree:entries})).data;
+            const commit = (await github.rest.git.createCommit({owner,repo,message:`Notification test ${context.runId}: ${outcome}`,tree:tree.sha,parents:head ? [head] : []})).data;
+            if(head) await github.rest.git.updateRef({owner,repo,ref:'heads/ci-results',sha:commit.sha,force:false});
+            else await github.rest.git.createRef({owner,repo,ref:'refs/heads/ci-results',sha:commit.sha});
+            await core.summary.addHeading('Notification test').addRaw(`Channel: ${channel}; outcome: ${outcome}; receipt: unverified. No automatic resend.\n`).write();

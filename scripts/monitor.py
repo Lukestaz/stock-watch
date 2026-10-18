@@ -1,5 +1,5 @@
-import os,json,urllib.request,urllib.parse,smtplib,ssl,math
-from email.message import EmailMessage
+import os,json,urllib.request,urllib.parse,math
+from notifications import send_email,send_whatsapp
 from datetime import datetime,timedelta,timezone
 from pathlib import Path
 
@@ -30,11 +30,6 @@ def bars(symbol,start,end,timeframe,adjustment):
         result.extend(data.get('bars') or [])
         token=data.get('next_page_token')
         if not token:return result
-
-def send_email(text):
-    msg=EmailMessage();msg['From']=os.environ['GMAIL_USER'];msg['To']=os.environ['ALERT_TO_EMAIL'];msg['Subject']='Space Stock Watch: review threshold';msg.set_content(text)
-    with smtplib.SMTP_SSL('smtp.gmail.com',465,context=ssl.create_default_context(),timeout=30) as smtp:
-        smtp.login(os.environ['GMAIL_USER'],os.environ['GMAIL_APP_PASSWORD'].replace(' ',''));smtp.send_message(msg)
 
 def save():
     statepath.parent.mkdir(exist_ok=True)
@@ -87,10 +82,7 @@ for eid,e in state['events'].items():
         e['attempts'][channel]+=1;save()
         try:
             if channel=='email':send_email(text)
-            else:
-                q=urllib.parse.urlencode({'phone':os.environ['WHATSAPP_PHONE'],'apikey':os.environ['WHATSAPP_API_KEY'],'text':text})
-                answer=request('https://api.callmebot.com/whatsapp.php?'+q)
-                if 'queued' not in answer.lower() and 'sent' not in answer.lower():raise RuntimeError('Gateway response requires verification')
+            else:send_whatsapp(text)
             e[channel]='accepted';public[channel]='last send accepted; delivery not independently verified'
         except Exception as exc:
             errors=True;print(channel,'send failed:',type(exc).__name__)
