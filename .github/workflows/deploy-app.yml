@@ -16,7 +16,6 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: c4814713eafd41ae857b9a8097610df6
       WRANGLER_SEND_METRICS: 'false'
-      APP_DIR: ${{ runner.temp }}/stock-watch-app
       APP_URL: https://stock-watch-app.lukestaz.workers.dev
     steps:
       - uses: actions/checkout@v4
@@ -28,6 +27,8 @@ jobs:
       - name: Build public local-only preview
         run: |
           set -euo pipefail
+          export APP_DIR="$RUNNER_TEMP/stock-watch-app"
+          echo "APP_DIR=$APP_DIR" >> "$GITHUB_ENV"
           test -n "$CLOUDFLARE_API_TOKEN"
           python3 - <<'PY'
           import os,json,shutil
