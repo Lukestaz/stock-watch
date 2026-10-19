@@ -1,0 +1,56 @@
+name: Deploy Stock Watch frontend preview
+on:
+  push:
+    branches: [feature/account-watchlist-sync]
+    paths: ['.github/workflows/deploy-app.yml']
+permissions:
+  contents: read
+concurrency:
+  group: deploy-stock-watch-app
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: c4814713eafd41ae857b9a8097610df6
+      WRANGLER_SEND_METRICS: 'false'
+      APP_DIR: ${{ runner.temp }}/stock-watch-app
+      APP_URL: https://stock-watch-app.lukestaz.workers.dev
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build public local-only preview
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          python3 - <<'PY'
+          import os,json,shutil
+          from pathlib import Path
+          p=Path(os.environ['APP_DIR']);p.mkdir(parents=True,exist_ok=True)
+          shutil.copytree('site',p/'static',dirs_exist_ok=True)
+          f=p/'static/market-data.js';s=f.read_text();old='https://stock-watch-prices.lukestaz.workers.dev';assert old in s;f.write_text(s.replace(old,'/api'))
+          f=p/'static/index.html';s=f.read_text();m='<main id="cards">';assert m in s;f.write_text(s.replace(m,'<p role="status">Public preview: targets save on this device only. Email sign-in and cloud sync are not enabled yet.</p>'+m,1))
+          (p/'worker.mjs').write_text(r"""const json=(body,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});export default {async fetch(request,env){const url=new URL(request.url);if(!['GET','HEAD'].includes(request.method))return json({error:'Method not allowed'},405);if(url.pathname==='/api/health')return json({ok:true,mode:'local-only-preview',build:env.BUILD_SHA});if(url.pathname==='/api/v1/stock'){const symbol=(url.searchParams.get('symbol')||'').trim().toUpperCase();if(!/^[A-Z0-9][A-Z0-9.\-]{0,14}$/.test(symbol))return json({error:'Invalid symbol'},400);try{const upstream=await env.PRICES.fetch(new Request('https://stock-watch-prices.lukestaz.workers.dev/v1/stock?symbol='+encodeURIComponent(symbol),{headers:{Accept:'application/json'},signal:AbortSignal.timeout(25000)}));const headers=new Headers({'Content-Type':'application/json','Cache-Control':'no-store'});if(upstream.headers.has('Retry-After'))headers.set('Retry-After',upstream.headers.get('Retry-After'));return new Response(upstream.body,{status:upstream.status,headers});}catch{return json({error:'Price service unavailable'},502);}}if(url.pathname.startsWith('/api/'))return json({error:'Not found'},404);return env.ASSETS.fetch(request);}};""")
+          (p/'wrangler.jsonc').write_text(json.dumps({'name':'stock-watch-app','main':'worker.mjs','compatibility_date':'2026-10-19','workers_dev':True,'preview_urls':False,'assets':{'directory':'./static','binding':'ASSETS','run_worker_first':True},'services':[{'binding':'PRICES','service':'stock-watch-prices'}]}))
+          PY
+          node --check "$APP_DIR/worker.mjs"
+      - name: Refuse to overwrite an existing Worker
+        run: |
+          set -euo pipefail
+          status=$(curl -sS -o "$RUNNER_TEMP/app-existing.txt" -w '%{http_code}' -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/stock-watch-app")
+          test "$status" = 404 || { echo 'Target exists or cannot be checked; deployment stopped'; exit 1; }
+      - name: Deploy separate Worker
+        run: npx --yes wrangler@4.150.0 deploy --config "$APP_DIR/wrangler.jsonc" --var "BUILD_SHA:$GITHUB_SHA"
+      - name: Verify revision and frontend
+        run: |
+          set -euo pipefail
+          curl -fsS --retry 5 --retry-all-errors --retry-delay 5 "$APP_URL/api/health" > "$RUNNER_TEMP/app-health.json"
+          node -e 'const h=require(process.env.RUNNER_TEMP+"/app-health.json");if(!h.ok||h.build!==process.env.GITHUB_SHA||h.mode!=="local-only-preview")process.exit(1)'
+          curl -fsS "$APP_URL/" | grep -q 'Public preview: targets save on this device only'
+          echo "Verified local-only frontend: $APP_URL" >> "$GITHUB_STEP_SUMMARY"
