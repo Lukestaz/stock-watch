@@ -21,5 +21,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Test account handler and SQLite-backed adapter
-        run: node --test worker/test/account-api.test.mjs worker/test/account-store.test.mjs
+      - name: Test account handler, adapter and identity core
+        run: node --test worker/test/account-*.test.mjs
