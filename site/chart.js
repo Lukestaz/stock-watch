@@ -3,7 +3,9 @@ const money=n=>Number.isFinite(n)?'$'+n.toLocaleString('en-US',{minimumFractionD
 function add(tag,text,parent,cls){const e=document.createElement(tag);e.textContent=text;if(cls)e.className=cls;parent.append(e);return e;}
 function dateLabel(t){const d=new Date(t.slice(0,10)+'T12:00:00Z');return new Intl.DateTimeFormat('en-NZ',{day:'numeric',month:'short',...(d.getUTCFullYear()!==new Date().getUTCFullYear()?{year:'numeric'}:{}),timeZone:'UTC'}).format(d);}
 function rangeLabel(a,b){const x=new Date(a.slice(0,10)+'T12:00:00Z'),y=new Date(b.slice(0,10)+'T12:00:00Z');const month=d=>new Intl.DateTimeFormat('en-NZ',{month:'short',timeZone:'UTC'}).format(d);if(x.getUTCFullYear()!==y.getUTCFullYear())return month(x)+' '+x.getUTCFullYear()+'–'+month(y)+' '+y.getUTCFullYear();return (x.getUTCMonth()===y.getUTCMonth()?month(y):month(x)+'–'+month(y))+' '+y.getUTCFullYear();}
-const selections=new Map();
+const selections=new Map(),resizeHandlers=new Map();
+const chartResize=new ResizeObserver(entries=>{for(const entry of entries)resizeHandlers.get(entry.target)?.(entry.contentRect.width);});
+new MutationObserver(()=>{for(const svg of resizeHandlers.keys())if(!svg.isConnected){chartResize.unobserve(svg);resizeHandlers.delete(svg);}}).observe($('#cards'),{childList:true});
 function chart(parent,stock){
  const bars=(stock.history||[]).filter(b=>b.t&&Number.isFinite(b.c)&&Number.isFinite(b.l)).sort((a,b)=>a.t.localeCompare(b.t));
  if(!bars.length){add('p','No daily history available yet.',parent);return;}
@@ -21,10 +23,10 @@ function chart(parent,stock){
  const left=slider('Range start'),right=slider('Range end');
  const back=add('button','← Earlier',controls),forward=add('button','Later →',controls);
  const summary=add('p','',parent,'muted chart-summary'),detail=add('p','',parent,'muted chart-history-details');
- const W=900,L=18,T=40,B=415;let R=820;
+ const W=900,L=18,T=40,B=415;let R=820,chartWidth=0,inspectedIndex=null;
  function node(tag,attrs,text){const n=document.createElementNS(svg.namespaceURI,tag);for(const [k,v] of Object.entries(attrs))n.setAttribute(k,v);if(text!==undefined)n.textContent=text;svg.append(n);return n;}
  let overlay,vertical,horizontal,dot,ys,xs;
- function inspect(index){const b=bars[index],x=xs(index),y=ys(b.c);vertical.setAttribute('x1',x);vertical.setAttribute('x2',x);horizontal.setAttribute('y1',y);horizontal.setAttribute('y2',y);dot.setAttribute('cx',x);dot.setAttribute('cy',y);for(const n of [vertical,horizontal,dot])n.setAttribute('visibility','visible');readout.textContent=dateLabel(b.t)+' · Close '+money(b.c)+' · Low '+money(b.l);}
+ function inspect(index){inspectedIndex=index;const b=bars[index],x=xs(index),y=ys(b.c);vertical.setAttribute('x1',x);vertical.setAttribute('x2',x);horizontal.setAttribute('y1',y);horizontal.setAttribute('y2',y);dot.setAttribute('cx',x);dot.setAttribute('cy',y);for(const n of [vertical,horizontal,dot])n.setAttribute('visibility','visible');readout.textContent=dateLabel(b.t)+' · Close '+money(b.c)+' · Low '+money(b.l);}
  function draw(){
   start=Math.max(0,Math.min(start,bars.length-1));end=Math.max(start,Math.min(end,bars.length-1));
   selections.set(stock.symbol,{from:bars[start].t.slice(0,10),to:bars[end].t.slice(0,10),showTarget});
@@ -35,15 +37,16 @@ function chart(parent,stock){
   const step=[1,2,2.5,5,10].map(n=>n*power).reduce((a,b)=>Math.abs(Math.log(b/raw))<Math.abs(Math.log(a/raw))?b:a);
   const decimals=Math.min(8,Math.max(0,-Math.floor(Math.log10(step)))+(Math.abs(step/10**Math.floor(Math.log10(step))-2.5)<1e-8?1:0));
   const axis=[];for(let i=Math.ceil(low/step),count=0;i*step<=high+step*1e-8&&count<12;i++,count++){const value=i*step;axis.push({value,label:value.toLocaleString('en-US',{maximumFractionDigits:decimals})});}
-  const longest=Math.max(3,...axis.map(t=>t.label.length));R=W-Math.min(220,Math.max(80,longest*15+28));
+  chartWidth=svg.getBoundingClientRect().width||W;const fontScale=Math.min(1,13*W/(25*chartWidth)),gap=12*fontScale;
+  const longest=Math.max(3,...axis.map(t=>t.label.length));R=W-Math.min(220,Math.max(80,longest*15+28)*fontScale);
   xs=i=>L+(i-start)/Math.max(1,end-start)*(R-L);ys=v=>B-(v-low)/(high-low)*(B-T);
-  for(const tick of axis){const y=ys(tick.value);node('line',{x1:L,x2:R,y1:y,y2:y,stroke:'#30425a','stroke-opacity':.55});node('text',{x:R+12,y:y+8,fill:'#aebed2','font-size':25},tick.label);}
-  const ticks=new Set([start,Math.round(start+(end-start)/3),Math.round(start+2*(end-start)/3),end]);for(const i of ticks){const x=xs(i);node('text',{x,y:B+38,fill:'#c1cfe0','font-size':24,'text-anchor':i===start?'start':i===end?'end':'middle'},dateLabel(bars[i].t));}
-  node('text',{x:R+12,y:24,fill:'#aebed2','font-size':21},'USD');
-  if(showTarget){const y=ys(stock.target);node('line',{x1:L,x2:R,y1:y,y2:y,stroke:'#ffcf7b','stroke-dasharray':'7 5'});node('text',{x:L+5,y:y-9,fill:'#ffcf7b','font-size':24},'Target '+money(stock.target));}
+  for(const tick of axis){const y=ys(tick.value);node('line',{x1:L,x2:R,y1:y,y2:y,stroke:'#30425a','stroke-opacity':.55});node('text',{class:'chart-axis-label',x:R+gap,y:y+8*fontScale,fill:'#aebed2','font-size':25*fontScale},tick.label);}
+  const ticks=new Set([start,Math.round(start+(end-start)/3),Math.round(start+2*(end-start)/3),end]);for(const i of ticks){const x=xs(i);node('text',{class:'chart-date-label',x,y:B+Math.max(20,38*fontScale),fill:'#c1cfe0','font-size':24*fontScale,'text-anchor':i===start?'start':i===end?'end':'middle'},dateLabel(bars[i].t));}
+  node('text',{class:'chart-currency-label',x:R+gap,y:24,fill:'#aebed2','font-size':21*fontScale},'USD');
+  if(showTarget){const y=ys(stock.target);node('line',{x1:L,x2:R,y1:y,y2:y,stroke:'#ffcf7b','stroke-dasharray':'7 5'});node('text',{class:'chart-target-label',x:L+5,y:y-9*fontScale,fill:'#ffcf7b','font-size':24*fontScale},'Target '+money(stock.target));}
   node('polyline',{points:view.map((b,j)=>xs(j+start)+','+ys(b.c)).join(' '),fill:'none',stroke:'#72e0c0','stroke-width':2.5});
   vertical=node('line',{x1:L,x2:L,y1:T,y2:B,stroke:'#cad9ed','stroke-dasharray':'3 4',visibility:'hidden'});horizontal=node('line',{x1:L,x2:R,y1:T,y2:T,stroke:'#cad9ed','stroke-dasharray':'3 4',visibility:'hidden'});dot=node('circle',{r:5,fill:'#fff',visibility:'hidden'});
-  overlay=node('rect',{x:L,y:T,width:R-L,height:B-T,fill:'transparent'});
+  overlay=node('rect',{class:'chart-hit-area',x:L,y:T,width:R-L,height:B-T,fill:'transparent'});
   function position(e){const rect=svg.getBoundingClientRect(),x=(e.clientX-rect.left)/rect.width*W;return Math.max(start,Math.min(end,Math.round(start+(x-L)/(R-L)*(end-start))));}
   overlay.addEventListener('pointermove',e=>inspect(position(e)));overlay.addEventListener('pointerdown',e=>inspect(position(e)));
   overlay.addEventListener('wheel',e=>{e.preventDefault();const anchor=position(e),old=Math.max(1,end-start),span=Math.min(bars.length-1,Math.max(4,Math.round(old*(e.deltaY>0?1.25:.8))));const ratio=(anchor-start)/old;start=Math.max(0,Math.min(bars.length-1-span,Math.round(anchor-span*ratio)));end=Math.min(bars.length-1,start+span);draw();},{passive:false});
@@ -59,6 +62,7 @@ function chart(parent,stock){
  function pan(dir){const step=Math.max(1,Math.round((end-start+1)/4)),delta=dir<0?-Math.min(step,start):Math.min(step,bars.length-1-end);start+=delta;end+=delta;draw();}
  back.onclick=()=>pan(-1);forward.onclick=()=>pan(1);reset.onclick=()=>period('6M');targetButton.onclick=()=>{showTarget=!showTarget;draw();};
  if(saved){start=dateIndex(saved.from);end=Math.max(start,dateIndex(saved.to,true));draw();}else period('6M');
+ resizeHandlers.set(svg,width=>{if(Math.abs(width-chartWidth)<.5)return;const index=inspectedIndex,pressed=Object.values(buttons).map(b=>b.getAttribute('aria-pressed'));draw();if(index!==null&&index>=start&&index<=end)inspect(index);Object.values(buttons).forEach((b,i)=>b.setAttribute('aria-pressed',pressed[i]||'false'));});chartResize.observe(svg);
 }
 let signature='',loading=false;
 async function load(){if(loading)return;loading=true;try{const r=await fetch('./data.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('Published data unavailable: HTTP '+r.status);const raw=await r.text();if(raw===signature)return;const d=JSON.parse(raw);signature=raw;const health=$('#health');health.replaceChildren();add('span','Prices: delayed by at least 15 minutes; timestamps shown per stock.',health);health.append(document.createElement('br'));add('span','Notifications: setup status shown below; delivery not yet tested.',health);health.append(document.createElement('br'));add('span','Email: '+d.email+' · WhatsApp: '+d.whatsapp,health);health.append(document.createElement('br'));add('span','Monitor run '+d.updated+' · Backend report: '+d.status,health);const root=$('#cards');root.replaceChildren();for(const s of d.stocks){const a=add('article','',root);add('h2',s.symbol+' · entry '+money(s.target),a);const daily=(s.history||[]).filter(b=>Number.isFinite(b.c)).at(-1);const hasQuote=Number.isFinite(s.price)&&s.time;const useDaily=daily&&(!hasQuote||Date.parse(daily.t)>Date.parse(s.time));const price=useDaily?daily.c:hasQuote?s.price:null,time=useDaily?daily.t:s.time;add('p',price!==null?(useDaily?'Last available daily close ':'Latest stored delayed close ')+money(price)+' · '+((price/s.target-1)*100).toFixed(1)+'% versus target':'Awaiting validated price',a,'price');add('p',time?'Market-data timestamp '+time+' · Not an executable quote':'No validated timestamp',a,'muted');if(s.status)add('p','Intraday monitor: '+s.status,a,'muted');if(time&&Date.now()-Date.parse(time)>3600000)add('p','Historical/stale observation — not a current market price.',a,'error');chart(a,s);}}catch(e){$('#health').textContent=e.message;}finally{loading=false;}}
