@@ -1,0 +1,11 @@
+{
+  "name": "stock-watch-app",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "stock-watch",
+      "database_id": "4cb54afc-8f2d-4f62-8b6b-7d59f343b938",
+      "migrations_dir": "migrations"
+    }
+  ]
+}
