@@ -45,6 +45,8 @@ jobs:
         run: |
           set -euo pipefail
           status=$(curl -sS -o "$RUNNER_TEMP/app-existing.txt" -w '%{http_code}' -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/stock-watch-app")
+          echo "Worker existence check HTTP: $status"
+          node -e 'const fs=require("node:fs");try{const x=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/app-existing.txt","utf8"));console.log("Cloudflare numeric error codes:",(Array.isArray(x.errors)?x.errors:[]).map(e=>e?.code).filter(Number.isInteger));}catch{console.log("Response body omitted (not a readable API error)");}'
           test "$status" = 404 || { echo 'Target exists or cannot be checked; deployment stopped'; exit 1; }
       - name: Deploy separate Worker
         run: npx --yes wrangler@4.150.0 deploy --config "$APP_DIR/wrangler.jsonc" --var "BUILD_SHA:$GITHUB_SHA"
