@@ -34,7 +34,7 @@ jobs:
           node -e 'const c=JSON.parse(require("node:fs").readFileSync("worker/wrangler.jsonc","utf8"));const b=c.d1_databases?.find(x=>x.binding==="DB");if(c.name!=="stock-watch-prices"||b?.database_id!=="4cb54afc-8f2d-4f62-8b6b-7d59f343b938"||b?.database_name!=="stock-watch")throw Error("Deployment target mismatch");'
           curl --fail --silent --show-error -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/stock-watch-prices" -o /dev/null
           npx --yes wrangler@4.150.0 d1 execute DB --remote --config worker/wrangler.jsonc --command "SELECT (SELECT count(*) FROM price_cache_entries) AS cache_rows, (SELECT count(*) FROM price_cache_budget) AS budget_rows;"
-      - name: Deploy price Worker with safe failure diagnostics
+      - name: Deploy price Worker with manual redirect fix
         run: |
           set -euo pipefail
           npx --yes wrangler@4.150.0 deploy --config worker/wrangler.jsonc --var "BUILD_SHA:$SOURCE_SHA"

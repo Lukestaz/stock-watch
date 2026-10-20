@@ -30,7 +30,7 @@ export function createAlpacaLoader({key, secret, fetcher = fetch,
         adjustment: history ? 'split' : 'raw', sort: history ? 'asc' : 'desc',
         ...(pageToken ? {page_token: pageToken} : {})}).toString();
       await beforeRequest();
-      const response = await fetcher(url.href, {redirect: 'error', signal: AbortSignal.timeout(15000),
+      const response = await fetcher(url.href, {redirect: 'manual', signal: AbortSignal.timeout(15000),
         headers: {'APCA-API-KEY-ID': key, 'APCA-API-SECRET-KEY': secret, Accept: 'application/json'}});
       if (!response.ok) {
         const retry = response.headers.get('Retry-After'), reset = Number(response.headers.get('X-RateLimit-Reset'));
