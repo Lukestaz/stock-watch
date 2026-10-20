@@ -1,0 +1,24 @@
+name: Price cache tests
+on:
+  push:
+    branches: [main, feature/account-watchlist-sync]
+    paths: ['worker/src/price-cache*.mjs', 'worker/test/price-cache*.test.mjs', 'worker/migrations/0004_price_cache.sql', 'tests/schema/price_cache_bridge.py', '.github/workflows/price-cache-tests.yml']
+  pull_request:
+    paths: ['worker/src/price-cache*.mjs', 'worker/test/price-cache*.test.mjs', 'worker/migrations/0004_price_cache.sql', 'tests/schema/price_cache_bridge.py', '.github/workflows/price-cache-tests.yml']
+permissions:
+  contents: read
+jobs:
+  cache:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: node --test worker/test/price-cache*.test.mjs
