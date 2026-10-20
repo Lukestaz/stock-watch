@@ -51,7 +51,7 @@ function fixture(t) {
       return decision;
     },
     keyFetcher: async (url, options) => {
-      keyCalls++; assert.equal(url, GOOGLE_JWKS_URL); assert.equal(options.redirect, 'error');
+      keyCalls++; assert.equal(url, GOOGLE_JWKS_URL); assert.equal(options.redirect, 'manual');
       if (!provider) throw Error('private provider detail');
       return Response.json({keys: [jwk]}, {headers: {'Cache-Control': 'max-age=3600'}});
     }};
