@@ -7,7 +7,7 @@ const response = (keys = [key()], headers = {}) => Response.json({keys}, {header
 test('fixed endpoint, cache reuse, defensive copies and expiration', async () => {
   let now = 0, calls = 0;
   const load = createGoogleKeyLoader({clock: () => now, fetcher: async (url, options) => {
-    calls++; assert.equal(url, GOOGLE_JWKS_URL); assert.equal(options.redirect, 'error'); assert.equal(options.credentials, 'omit');
+    calls++; assert.equal(url, GOOGLE_JWKS_URL); assert.equal(options.redirect, 'manual'); assert.equal(options.credentials, 'omit');
     assert.ok(options.signal instanceof AbortSignal); return response();
   }});
   const first = await load(); first[0].kid = 'mutated';
@@ -31,9 +31,10 @@ test('cache policy and Age prevent use beyond freshness', async () => {
   }
 });
 
-test('bad HTTP, content, duplicate keys and private material fail closed', async () => {
+test('bad HTTP, redirects, content, duplicate keys and private material fail closed', async () => {
   const factories = [
     () => new Response('denied', {status: 403}),
+    () => new Response(null, {status: 302, headers: {Location: 'https://untrusted.example/keys'}}),
     () => new Response('{}', {headers: {'Content-Type': 'text/html'}}),
     () => new Response('{', {headers: {'Content-Type': 'application/json'}}),
     () => response([]), () => response([key(), key()]),

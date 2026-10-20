@@ -24,7 +24,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Build public local-only preview
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require account regression tests before deployment
+        run: node --test worker/test/account-*.test.mjs
+      - name: Build real app runtime with accounts disabled
         run: |
           set -euo pipefail
           export APP_DIR="$RUNNER_TEMP/stock-watch-app"
@@ -35,12 +40,12 @@ jobs:
           from pathlib import Path
           p=Path(os.environ['APP_DIR']);p.mkdir(parents=True,exist_ok=True)
           shutil.copytree('site',p/'static',dirs_exist_ok=True)
+          shutil.copytree('worker/src',p/'src',dirs_exist_ok=True)
           f=p/'static/market-data.js';s=f.read_text();old='https://stock-watch-prices.lukestaz.workers.dev';assert old in s;f.write_text(s.replace(old,'/api'))
           f=p/'static/index.html';s=f.read_text();m='<main id="cards">';assert m in s;f.write_text(s.replace(m,'<p role="status">Public preview: targets save on this device only. Email sign-in and cloud sync are not enabled yet.</p>'+m,1))
-          (p/'worker.mjs').write_text(r"""const json=(body,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});export default {async fetch(request,env){const url=new URL(request.url);if(!['GET','HEAD'].includes(request.method))return json({error:'Method not allowed'},405);if(url.pathname==='/api/health')return json({ok:true,mode:'local-only-preview',build:env.BUILD_SHA});if(url.pathname==='/api/v1/stock'){const symbol=(url.searchParams.get('symbol')||'').trim().toUpperCase();if(!/^[A-Z0-9][A-Z0-9.\-]{0,14}$/.test(symbol))return json({error:'Invalid symbol'},400);try{const upstream=await env.PRICES.fetch(new Request('https://stock-watch-prices.lukestaz.workers.dev/v1/stock?symbol='+encodeURIComponent(symbol),{headers:{Accept:'application/json'},signal:AbortSignal.timeout(25000)}));const headers=new Headers({'Content-Type':'application/json','Cache-Control':'no-store'});if(upstream.headers.has('Retry-After'))headers.set('Retry-After',upstream.headers.get('Retry-After'));return new Response(upstream.body,{status:upstream.status,headers});}catch{return json({error:'Price service unavailable'},502);}}if(url.pathname.startsWith('/api/'))return json({error:'Not found'},404);return env.ASSETS.fetch(request);}};""")
-          (p/'wrangler.jsonc').write_text(json.dumps({'name':'stock-watch-app','main':'worker.mjs','compatibility_date':'2026-10-19','workers_dev':True,'preview_urls':False,'assets':{'directory':'./static','binding':'ASSETS','run_worker_first':True},'services':[{'binding':'PRICES','service':'stock-watch-prices'}]}))
+          (p/'wrangler.jsonc').write_text(json.dumps({'name':'stock-watch-app','main':'src/account-runtime.mjs','compatibility_date':'2026-10-19','workers_dev':True,'preview_urls':False,'vars':{'ACCOUNTS_ENABLED':'false','APP_ORIGIN':os.environ['APP_URL']},'assets':{'directory':'./static','binding':'ASSETS','run_worker_first':True},'services':[{'binding':'PRICES','service':'stock-watch-prices'}]}))
           PY
-          node --check "$APP_DIR/worker.mjs"
+          node --check "$APP_DIR/src/account-runtime.mjs"
       - name: Require the explicitly provisioned app Worker
         run: |
           set -euo pipefail
@@ -48,12 +53,16 @@ jobs:
           echo "Worker existence check HTTP: $status"
           node -e 'const fs=require("node:fs");try{const x=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/app-existing.txt","utf8"));console.log("Cloudflare numeric error codes:",(Array.isArray(x.errors)?x.errors:[]).map(e=>e?.code).filter(Number.isInteger));}catch{console.log("Response body omitted (not a readable API error)");}'
           test "$status" = 200 || { echo 'Expected stock-watch-app to exist and be readable; deployment stopped'; exit 1; }
-      - name: Deploy separate Worker
+      - name: Deploy separate Worker with account runtime wired but disabled
         run: npx --yes wrangler@4.150.0 deploy --config "$APP_DIR/wrangler.jsonc" --var "BUILD_SHA:$GITHUB_SHA"
-      - name: Verify revision and frontend
+      - name: Verify revision, frontend and disabled account route
         run: |
           set -euo pipefail
           curl -fsS --retry 5 --retry-all-errors --retry-delay 5 "$APP_URL/api/health" > "$RUNNER_TEMP/app-health.json"
           node -e 'const h=require(process.env.RUNNER_TEMP+"/app-health.json");if(!h.ok||h.build!==process.env.GITHUB_SHA||h.mode!=="local-only-preview")process.exit(1)'
-          curl -fsS "$APP_URL/" | grep -q 'Public preview: targets save on this device only'
-          echo "Verified local-only frontend: $APP_URL" >> "$GITHUB_STEP_SUMMARY"
+          curl -fsS "$APP_URL/" -o "$RUNNER_TEMP/app-index.html"
+          grep -q 'Public preview: targets save on this device only' "$RUNNER_TEMP/app-index.html"
+          status=$(curl -sS -D "$RUNNER_TEMP/account-headers.txt" -o "$RUNNER_TEMP/account-disabled.json" -w '%{http_code}' -H 'Sec-Fetch-Site: same-origin' "$APP_URL/api/v1/watchlist")
+          test "$status" = 503
+          node -e 'const fs=require("node:fs"),p=process.env.RUNNER_TEMP;if(JSON.parse(fs.readFileSync(p+"/account-disabled.json","utf8")).error!=="Account service unavailable"||/^set-cookie:/im.test(fs.readFileSync(p+"/account-headers.txt","utf8")))process.exit(1)'
+          echo "Verified app runtime and disabled account route: $APP_URL. No account activation or migrations." >> "$GITHUB_STEP_SUMMARY"

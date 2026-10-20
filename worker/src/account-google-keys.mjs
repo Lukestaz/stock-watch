@@ -13,7 +13,7 @@ export function createGoogleKeyLoader({fetcher=fetch,clock=Date.now,timeoutMs=50
  async function refresh(){
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
   try{
-   const response=await fetcher(GOOGLE_JWKS_URL,{redirect:'error',credentials:'omit',headers:{Accept:'application/json'},signal:controller.signal});
+   const response=await fetcher(GOOGLE_JWKS_URL,{redirect:'manual',credentials:'omit',headers:{Accept:'application/json'},signal:controller.signal});
    if(!response.ok||response.redirected||response.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase()!=='application/json'){await response.body?.cancel();throw Error();}
    const body=await readBoundedJson(response,65536),seen=new Set();
    if(!Array.isArray(body.keys)||body.keys.length<1||body.keys.length>10)throw Error();
