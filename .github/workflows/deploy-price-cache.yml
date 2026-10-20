@@ -15,14 +15,14 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: c4814713eafd41ae857b9a8097610df6
-      SOURCE_SHA: b71b0e006e737227e7e104ac016003821e882db0
+      SOURCE_SHA: ${{ github.sha }}
       PRICE_ENDPOINT: https://stock-watch-prices.lukestaz.workers.dev
       WRANGLER_SEND_METRICS: 'false'
       CI: 'true'
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: b71b0e006e737227e7e104ac016003821e882db0
+          ref: ${{ github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -34,7 +34,7 @@ jobs:
           node -e 'const c=JSON.parse(require("node:fs").readFileSync("worker/wrangler.jsonc","utf8"));const b=c.d1_databases?.find(x=>x.binding==="DB");if(c.name!=="stock-watch-prices"||b?.database_id!=="4cb54afc-8f2d-4f62-8b6b-7d59f343b938"||b?.database_name!=="stock-watch")throw Error("Deployment target mismatch");'
           curl --fail --silent --show-error -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/stock-watch-prices" -o /dev/null
           npx --yes wrangler@4.150.0 d1 execute DB --remote --config worker/wrangler.jsonc --command "SELECT (SELECT count(*) FROM price_cache_entries) AS cache_rows, (SELECT count(*) FROM price_cache_budget) AS budget_rows;"
-      - name: Deploy pinned price Worker with DB binding and cleanup trigger
+      - name: Deploy price Worker with safe failure diagnostics
         run: |
           set -euo pipefail
           npx --yes wrangler@4.150.0 deploy --config worker/wrangler.jsonc --var "BUILD_SHA:$SOURCE_SHA"
@@ -50,11 +50,14 @@ jobs:
             sleep 5
           done
           test "$verified" = true || { echo 'Live price revision or database health did not verify'; exit 1; }
-      - name: Check AAPL price and repeated cache snapshot
+      - name: Check AAPL and print safe diagnostics on failure
         run: |
           set -euo pipefail
-          curl -fsS --max-time 60 --retry 2 --retry-all-errors --retry-delay 3 "$PRICE_ENDPOINT/v1/stock?symbol=AAPL" > "$RUNNER_TEMP/price-first.json"
-          curl -fsS --max-time 60 --retry 2 --retry-all-errors --retry-delay 3 "$PRICE_ENDPOINT/v1/stock?symbol=AAPL" > "$RUNNER_TEMP/price-second.json"
+          for sample in first second; do
+            export PRICE_SAMPLE="$sample"
+            export HTTP_STATUS=$(curl -sS --max-time 60 -o "$RUNNER_TEMP/price-$sample.json" -w '%{http_code}' "$PRICE_ENDPOINT/v1/stock?symbol=AAPL")
+            node -e 'const fs=require("node:fs");let d;try{d=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/price-"+process.env.PRICE_SAMPLE+".json","utf8"));}catch{console.error("Non-JSON price response; body omitted");process.exit(1);}console.log(JSON.stringify({sample:process.env.PRICE_SAMPLE,httpStatus:process.env.HTTP_STATUS,error:d.error,diagnostics:d.diagnostics,cache:d.cache}));if(process.env.HTTP_STATUS!=="200")process.exit(1);'
+          done
           node -e 'const fs=require("node:fs"),read=n=>JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/price-"+n+".json","utf8")),a=read("first"),b=read("second");for(const d of [a,b])if(d.symbol!=="AAPL"||!Number.isFinite(d.price)||d.price<=0||!Array.isArray(d.history)||!d.history.length||![d.cache?.history?.state,d.cache?.latest?.state].every(s=>["fresh","stale"].includes(s)))throw Error("AAPL price/cache verification failed");console.log(JSON.stringify({symbol:b.symbol,price:b.price,time:b.time,cache:b.cache,sameSnapshot:a.cache.history.checkedAt===b.cache.history.checkedAt&&a.cache.latest.checkedAt===b.cache.latest.checkedAt}));'
           echo "Verified D1 price Worker revision $SOURCE_SHA and two AAPL cache responses. Frontend unchanged." >> "$GITHUB_STEP_SUMMARY"
       - name: Report incomplete deployment verification

@@ -3,8 +3,28 @@ export function cleanBars(rows,end){return (rows||[]).filter(b=>b&&typeof b.t===
 const json=(body,status=200,extra={})=>Response.json(body,{status,headers:{'Cache-Control':'no-store',...extra}});
 async function makeService(env){
  const [{createPriceCache},{createAlpacaLoader}]=await Promise.all([import('./price-cache.mjs'),import('./price-cache-alpaca.mjs')]);
- return createPriceCache({db:env.DB,load:createAlpacaLoader({key:env.ALPACA_KEY,secret:env.ALPACA_SECRET}),
-  dailyLimit:Number(env.PRICE_DAILY_LIMIT||5000),minuteLimit:Number(env.PRICE_MINUTE_LIMIT||100)});
+ const trace={},labels=new WeakMap();
+ const db={prepare(sql){return {bind(...args){try{
+  const statement=env.DB.prepare(sql).bind(...args);labels.set(statement,sql.includes('SET payload=')?'save':'query');return statement;
+ }catch(e){trace.database||={stage:'prepare-or-bind'};throw e;}}};},async batch(statements){
+  try{const r=await env.DB.batch(statements);if(r.some(x=>x.success!==true))trace.database||={stage:statements.some(s=>labels.get(s)==='save')?'save':'query'};return r;}
+  catch(e){trace.database||={stage:statements.some(s=>labels.get(s)==='save')?'save':'query'};throw e;}
+ }};
+ const loader=createAlpacaLoader({key:env.ALPACA_KEY,secret:env.ALPACA_SECRET,fetcher:async(input,init)=>{
+  const kind=new URL(input).searchParams.get('timeframe')==='1Day'?'history':'latest';trace[kind]={stage:'network'};
+  try{const r=await globalThis.fetch(input,init);trace[kind]={stage:'response',providerStatus:r.status};return r;}
+  catch(e){trace[kind]={stage:'network',failure:['TypeError','AbortError','TimeoutError'].includes(e?.name)?e.name:'fetch-failed'};throw e;}
+ }});
+ const cache=createPriceCache({db,load:async(kind,symbol,options)=>{
+  trace[kind]={stage:'budget-or-load'};
+  try{const value=await loader(kind,symbol,options);trace[kind]={...trace[kind],stage:'decoded',
+   payloadBytes:new TextEncoder().encode(JSON.stringify(value)).length,bars:Array.isArray(value.history)?value.history.length:0};return value;}
+  catch(e){trace[kind]={...trace[kind],failure:['budget','rate-limit','not-found','pagination-limit'].includes(e?.code)?e.code:e?.name==='SyntaxError'?'invalid-json':'load-error'};throw e;}
+ },dailyLimit:Number(env.PRICE_DAILY_LIMIT||5000),minuteLimit:Number(env.PRICE_MINUTE_LIMIT||100)});
+ return {async get(symbol){try{
+  const data=await cache.get(symbol);
+  return [data.cache?.history?.state,data.cache?.latest?.state].includes('unavailable')?{...data,diagnostics:trace}:data;
+ }catch(e){const failure=Error('Cache unavailable');failure.code=e?.code;failure.retryAt=e?.retryAt;failure.diagnostics=trace;throw failure;}},cleanup:()=>cache.cleanup()};
 }
 export function createPriceWorker({service=makeService,edge=()=>globalThis.caches?.default}={}){
  async function handle(request,env,ctx){
@@ -41,7 +61,7 @@ export function createPriceWorker({service=makeService,edge=()=>globalThis.cache
   }catch(e){
    const wait=Number.isSafeInteger(e?.retryAt)&&e.retryAt>Math.floor(Date.now()/1000)?Math.max(1,Math.min(86400,e.retryAt-Math.floor(Date.now()/1000))):60;
    const status=['budget','rate-limit'].includes(e?.code)?429:503;
-   return json({error:'Market data temporarily unavailable; retry later',symbol},status,{'Retry-After':String(wait)});
+   return json({error:'Market data temporarily unavailable; retry later',symbol,diagnostics:e?.diagnostics},status,{'Retry-After':String(wait)});
   }
  }
  return {async fetch(request,env,ctx){
