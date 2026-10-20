@@ -1,8 +1,13 @@
-name: Deploy Stock Watch frontend preview
+name: Deploy Stock Watch app
 on:
+  workflow_dispatch:
   push:
-    branches: [feature/account-watchlist-sync]
-    paths: ['.github/workflows/deploy-app.yml', 'site/**', 'worker/src/account-*.mjs', 'worker/test/account-*.test.mjs', 'worker/wrangler.d1.jsonc']
+    branches: [main]
+    paths: ['.github/workflows/deploy-app.yml', 'site/**', 'worker/src/account-*.mjs', 'worker/test/account-*.test.mjs', 'worker/wrangler.d1.jsonc', 'legacy-pages/**', 'tests/legacy-pages.test.mjs']
+  workflow_run:
+    workflows: ['Monitor stock alerts', 'Refresh ticker catalogue']
+    types: [completed]
+    branches: [main]
 permissions:
   contents: read
 concurrency:
@@ -10,6 +15,12 @@ concurrency:
   cancel-in-progress: false
 jobs:
   deploy:
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name != 'workflow_run' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -20,6 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -27,11 +39,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Require account regression tests before deployment
+      - name: Require account and legacy-page regression tests before deployment
         run: |
-          node --test worker/test/account-*.test.mjs
+          node --test worker/test/account-*.test.mjs tests/legacy-pages.test.mjs
           node --check site/account-signin.js
-      - name: Build Google account preview with existing D1
+      - name: Build account app with existing D1
         run: |
           set -euo pipefail
           export APP_DIR="$RUNNER_TEMP/stock-watch-app"
@@ -44,7 +56,7 @@ jobs:
           shutil.copytree('site',p/'static',dirs_exist_ok=True)
           shutil.copytree('worker/src',p/'src',dirs_exist_ok=True)
           f=p/'static/market-data.js';s=f.read_text();old='https://stock-watch-prices.lukestaz.workers.dev';assert old in s;f.write_text(s.replace(old,'/api'))
-          f=p/'static/index.html';s=f.read_text();m='<main id="cards">';assert m in s;f.write_text(s.replace(m,'<p role="status">Account preview: Google sign-in is enabled. Targets still save on this device only; cloud sync and account alerts are not enabled.</p>'+m,1))
+          f=p/'static/index.html';s=f.read_text();m='<main id="cards">';assert m in s;f.write_text(s.replace(m,'<p role="status">Stock Watch: Google sign-in and account watchlist sync are enabled. Guest edits stay on this device. Account alerts are not enabled.</p>'+m,1))
           d=json.loads(Path('worker/wrangler.d1.jsonc').read_text());b=d['d1_databases'];assert d['name']=='stock-watch-app' and len(b)==1 and b[0]['binding']=='DB' and b[0]['database_name']=='stock-watch' and b[0]['database_id']=='4cb54afc-8f2d-4f62-8b6b-7d59f343b938'
           (p/'wrangler.jsonc').write_text(json.dumps({'name':'stock-watch-app','main':'src/account-runtime.mjs','compatibility_date':'2026-10-19','workers_dev':True,'preview_urls':False,'d1_databases':[{k:b[0][k] for k in ('binding','database_name','database_id')}],'vars':{'ACCOUNTS_ENABLED':'true','APP_ORIGIN':os.environ['APP_URL'],'GOOGLE_CLIENT_ID':'19866673111-hg5958bvoiqoa5crrt0jmalvh1mssfvk.apps.googleusercontent.com'},'ratelimits':[{'name':'ACCOUNT_LIMIT','namespace_id':'1986667311','simple':{'limit':30,'period':60}}],'assets':{'directory':'./static','binding':'ASSETS','run_worker_first':True},'services':[{'binding':'PRICES','service':'stock-watch-prices'}]}))
           PY
@@ -86,7 +98,7 @@ jobs:
           }
           assert.ok(!failed, 'Account schema incomplete; no migrations were applied');
           JS
-      - name: Deploy Google account preview
+      - name: Deploy account app
         run: npx --yes wrangler@4.150.0 deploy --config "$APP_DIR/wrangler.jsonc" --var "BUILD_SHA:$GITHUB_SHA"
       - name: Verify revision, frontend, anonymous isolation and origin rejection
         run: |
@@ -109,7 +121,7 @@ jobs:
           check('health-build-account-mode-database',healthPassed);
           try {
             const r = await get('/'), html = await r.text();
-            check('frontend-signin-and-preview-notice',r.ok && html.includes('./account-signin.js') && html.includes('Account preview: Google sign-in is enabled.'));
+            check('frontend-signin-and-status',r.ok && html.includes('./account-signin.js') && html.includes('Stock Watch: Google sign-in and account watchlist sync are enabled.'));
             const script = await get('/account-signin.js');
             check('signin-script',script.ok && (await script.text()).includes('19866673111-hg5958bvoiqoa5crrt0jmalvh1mssfvk.apps.googleusercontent.com'));
           } catch { check('frontend-request',false); }
@@ -121,5 +133,5 @@ jobs:
             check('cross-origin-login-denied',unsafe.status === 403 && !unsafe.headers.has('set-cookie'));
           } catch { check('account-route-request',false); }
           if (failed) { console.error('Verification failed. No automatic rollback was performed.'); process.exit(1); }
-          appendFileSync(process.env.GITHUB_STEP_SUMMARY,`Verified Google account preview at ${origin}, build ${process.env.GITHUB_SHA}. No migrations, watchlist sync, or account alerts enabled. Real Google login still requires browser verification.\n`);
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY,`Verified account app at ${origin}, build ${process.env.GITHUB_SHA}. No migrations or account alerts enabled. Signed-in browser checks are separate.\n`);
           JS
