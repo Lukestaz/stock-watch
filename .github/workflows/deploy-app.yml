@@ -59,11 +59,42 @@ jobs:
       - name: Verify revision, frontend and disabled account route
         run: |
           set -euo pipefail
-          curl -fsS --retry 5 --retry-all-errors --retry-delay 5 "$APP_URL/api/health" > "$RUNNER_TEMP/app-health.json"
-          node -e 'const h=require(process.env.RUNNER_TEMP+"/app-health.json");if(!h.ok||h.build!==process.env.GITHUB_SHA||h.mode!=="local-only-preview")process.exit(1)'
-          curl -fsS "$APP_URL/" -o "$RUNNER_TEMP/app-index.html"
-          grep -q 'Public preview: targets save on this device only' "$RUNNER_TEMP/app-index.html"
-          status=$(curl -sS -D "$RUNNER_TEMP/account-headers.txt" -o "$RUNNER_TEMP/account-disabled.json" -w '%{http_code}' -H 'Sec-Fetch-Site: same-origin' "$APP_URL/api/v1/watchlist")
-          test "$status" = 503
-          node -e 'const fs=require("node:fs"),p=process.env.RUNNER_TEMP;if(JSON.parse(fs.readFileSync(p+"/account-disabled.json","utf8")).error!=="Account service unavailable"||/^set-cookie:/im.test(fs.readFileSync(p+"/account-headers.txt","utf8")))process.exit(1)'
+          failed=0
+          echo 'Checking health HTTP response and revision'
+          if curl -fsS --max-time 20 --retry 5 --retry-all-errors --retry-delay 5 "$APP_URL/api/health" > "$RUNNER_TEMP/app-health.json"; then
+            node -e 'const fs=require("node:fs");let h;try{h=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/app-health.json","utf8"));}catch{console.log(JSON.stringify({check:"health",passed:false,jsonReadable:false}));process.exit(1);}const ok=h?.ok===true,buildMatches=h?.build===process.env.GITHUB_SHA,modeMatches=h?.mode==="local-only-preview";console.log(JSON.stringify({check:"health",passed:ok&&buildMatches&&modeMatches,ok,buildMatches,modeMatches,expectedBuild:process.env.GITHUB_SHA,receivedBuild:/^[a-f0-9]{40}$/.test(h?.build)?h.build:"unexpected-or-missing",mode:["local-only-preview","account-preview"].includes(h?.mode)?h.mode:"unexpected-or-missing"}));if(!ok||!buildMatches||!modeMatches)process.exit(1);' || failed=1
+          else
+            echo '{"check":"health-http","passed":false}'
+            failed=1
+          fi
+          echo 'Checking homepage and preview notice'
+          if curl -fsS --max-time 20 "$APP_URL/" -o "$RUNNER_TEMP/app-index.html"; then
+            if grep -q 'Public preview: targets save on this device only' "$RUNNER_TEMP/app-index.html"; then
+              echo '{"check":"preview-notice","passed":true}'
+            else
+              echo '{"check":"preview-notice","passed":false}'
+              failed=1
+            fi
+          else
+            echo '{"check":"homepage-http","passed":false}'
+            failed=1
+          fi
+          echo 'Checking disabled watchlist route, error match and cookie-header presence'
+          if status=$(curl -sS --max-time 20 -D "$RUNNER_TEMP/account-headers.txt" -o "$RUNNER_TEMP/account-disabled.json" -w '%{http_code}' -H 'Sec-Fetch-Site: same-origin' "$APP_URL/api/v1/watchlist"); then
+            echo "Disabled watchlist HTTP status: $status (expected 503)"
+            if test "$status" = 503; then
+              echo '{"check":"watchlist-http","passed":true}'
+            else
+              echo '{"check":"watchlist-http","passed":false}'
+              failed=1
+            fi
+            node -e 'const fs=require("node:fs"),p=process.env.RUNNER_TEMP;let readable=false,errorMatches=false;try{const d=JSON.parse(fs.readFileSync(p+"/account-disabled.json","utf8"));readable=true;errorMatches=d?.error==="Account service unavailable";}catch{}const cookieHeaderPresent=/^set-cookie:/im.test(fs.readFileSync(p+"/account-headers.txt","utf8"));console.log(JSON.stringify({check:"watchlist-error",passed:errorMatches,jsonReadable:readable,errorMatches}));console.log(JSON.stringify({check:"no-account-cookie",passed:!cookieHeaderPresent,cookieHeaderPresent}));if(!errorMatches||cookieHeaderPresent)process.exit(1);' || failed=1
+          else
+            echo '{"check":"watchlist-request","passed":false}'
+            failed=1
+          fi
+          if test "$failed" != 0; then
+            echo 'Verification failed; inspect the checks marked passed:false. No automatic rollback was performed.'
+            exit 1
+          fi
           echo "Verified app runtime and disabled account route: $APP_URL. No account activation or migrations." >> "$GITHUB_STEP_SUMMARY"
