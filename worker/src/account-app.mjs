@@ -6,7 +6,6 @@ const accountPaths = new Set([
   '/api/v1/auth/complete', '/api/v1/auth/logout'
 ]);
 
-// Preparatory entry point only; the deployment workflow still builds its own Worker.
 // Account handlers must be trusted server-side composition, never request input.
 export function createApp({accounts = {}} = {}) {
   const {enabled, allowedOrigin, handle} = accounts;
@@ -38,7 +37,25 @@ export function createApp({accounts = {}} = {}) {
         return json({error: 'Method not allowed'}, 405);
       }
       if (url.pathname === '/api/health') {
-        return json({ok: true, mode: ready ? 'account-preview' : 'local-only-preview', build: env.BUILD_SHA});
+        let database;
+        if (env.DB) {
+          database = {bound: true, ready: false};
+          try {
+            const probes = [
+              'SELECT id, google_sub, created_at FROM users LIMIT 0',
+              'SELECT user_id, revision, monitor_applied_revision, updated_at, write_token FROM watchlists LIMIT 0',
+              'SELECT user_id, symbol, target_usd, position, alerts_enabled, email_enabled, whatsapp_enabled, target_revision, updated_at FROM watchlist_entries LIMIT 0',
+              'SELECT challenge_hash, created_at, expires_at, used_by FROM login_challenges LIMIT 0',
+              'SELECT token_hash, user_id, created_at, last_seen_at, expires_at FROM sessions LIMIT 0'
+            ];
+            const results = await env.DB.batch(probes.map(sql => env.DB.prepare(sql)));
+            database.ready = results.length === probes.length && results.every(r =>
+              r?.success === true && Array.isArray(r.results) && r.results.length === 0);
+          } catch {}
+        }
+        const ok = database ? database.ready : true;
+        return json({ok, mode: ready ? 'account-preview' : 'local-only-preview', build: env.BUILD_SHA,
+          ...(database ? {database} : {})}, ok ? 200 : 503);
       }
       if (url.pathname === '/api/v1/stock') {
         const symbol = (url.searchParams.get('symbol') || '').trim().toUpperCase();

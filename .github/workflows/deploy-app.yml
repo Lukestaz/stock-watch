@@ -44,7 +44,8 @@ jobs:
           shutil.copytree('worker/src',p/'src',dirs_exist_ok=True)
           f=p/'static/market-data.js';s=f.read_text();old='https://stock-watch-prices.lukestaz.workers.dev';assert old in s;f.write_text(s.replace(old,'/api'))
           f=p/'static/index.html';s=f.read_text();m='<main id="cards">';assert m in s;f.write_text(s.replace(m,'<p role="status">Public preview: targets save on this device only. Email sign-in and cloud sync are not enabled yet.</p>'+m,1))
-          (p/'wrangler.jsonc').write_text(json.dumps({'name':'stock-watch-app','main':'src/account-runtime.mjs','compatibility_date':'2026-10-19','workers_dev':True,'preview_urls':False,'vars':{'ACCOUNTS_ENABLED':'false','APP_ORIGIN':os.environ['APP_URL']},'assets':{'directory':'./static','binding':'ASSETS','run_worker_first':True},'services':[{'binding':'PRICES','service':'stock-watch-prices'}]}))
+          d=json.loads(Path('worker/wrangler.d1.jsonc').read_text());b=d['d1_databases'];assert d['name']=='stock-watch-app' and len(b)==1 and b[0]['binding']=='DB' and b[0]['database_name']=='stock-watch' and b[0]['database_id']=='4cb54afc-8f2d-4f62-8b6b-7d59f343b938'
+          (p/'wrangler.jsonc').write_text(json.dumps({'name':'stock-watch-app','main':'src/account-runtime.mjs','compatibility_date':'2026-10-19','workers_dev':True,'preview_urls':False,'d1_databases':[{k:b[0][k] for k in ('binding','database_name','database_id')}],'vars':{'ACCOUNTS_ENABLED':'false','APP_ORIGIN':os.environ['APP_URL']},'assets':{'directory':'./static','binding':'ASSETS','run_worker_first':True},'services':[{'binding':'PRICES','service':'stock-watch-prices'}]}))
           PY
           node --check "$APP_DIR/src/account-runtime.mjs"
       - name: Require the explicitly provisioned app Worker
@@ -54,6 +55,37 @@ jobs:
           echo "Worker existence check HTTP: $status"
           node -e 'const fs=require("node:fs");try{const x=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/app-existing.txt","utf8"));console.log("Cloudflare numeric error codes:",(Array.isArray(x.errors)?x.errors:[]).map(e=>e?.code).filter(Number.isInteger));}catch{console.log("Response body omitted (not a readable API error)");}'
           test "$status" = 200 || { echo 'Expected stock-watch-app to exist and be readable; deployment stopped'; exit 1; }
+      - name: Check existing account schema without reading private rows
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.150.0 d1 execute DB --remote --config "$APP_DIR/wrangler.jsonc" --command "PRAGMA table_info(users); PRAGMA table_info(watchlists); PRAGMA table_info(watchlist_entries); PRAGMA table_info(login_challenges); PRAGMA table_info(sessions); SELECT name, type FROM sqlite_schema WHERE name IN ('watchlist_entries_order','watchlist_entries_limit_insert','watchlist_entries_limit_move','login_challenges_expiry','sessions_user','sessions_expiry');" --json > "$RUNNER_TEMP/account-schema.json"
+          node <<'JS'
+          const fs = require('node:fs');
+          const reports = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + '/account-schema.json', 'utf8'));
+          if (!Array.isArray(reports) || reports.length !== 6) throw Error('Unexpected schema metadata response');
+          const tables = {
+            users: ['id', 'google_sub', 'created_at'],
+            watchlists: ['user_id', 'revision', 'monitor_applied_revision', 'updated_at', 'write_token'],
+            watchlist_entries: ['user_id', 'symbol', 'target_usd', 'position', 'alerts_enabled', 'email_enabled', 'whatsapp_enabled', 'target_revision', 'updated_at'],
+            login_challenges: ['challenge_hash', 'created_at', 'expires_at', 'used_by'],
+            sessions: ['token_hash', 'user_id', 'created_at', 'last_seen_at', 'expires_at']
+          };
+          let failed = false;
+          for (const [i, [table, required]] of Object.entries(tables).entries()) {
+            const columns = new Set((reports[i].results || []).map(c => c.name));
+            const missing = required.filter(c => !columns.has(c));
+            const passed = reports[i].success === true && missing.length === 0;
+            console.log(JSON.stringify({check: 'account-table', table, passed, missing}));
+            if (!passed) failed = true;
+          }
+          const objects = new Map((reports[5].results || []).map(o => [o.name, o.type]));
+          for (const [name, type] of Object.entries({watchlist_entries_order: 'index', watchlist_entries_limit_insert: 'trigger', watchlist_entries_limit_move: 'trigger', login_challenges_expiry: 'index', sessions_user: 'index', sessions_expiry: 'index'})) {
+            const passed = reports[5].success === true && objects.get(name) === type;
+            console.log(JSON.stringify({check: 'account-schema-object', name, type, passed}));
+            if (!passed) failed = true;
+          }
+          if (failed) throw Error('Account schema is incomplete; no migrations were applied');
+          JS
       - name: Deploy separate Worker with account runtime wired but disabled
         run: npx --yes wrangler@4.150.0 deploy --config "$APP_DIR/wrangler.jsonc" --var "BUILD_SHA:$GITHUB_SHA"
       - name: Verify revision, frontend and disabled account route
@@ -62,7 +94,7 @@ jobs:
           failed=0
           echo 'Checking health HTTP response and revision'
           if curl -fsS --max-time 20 --retry 5 --retry-all-errors --retry-delay 5 "$APP_URL/api/health" > "$RUNNER_TEMP/app-health.json"; then
-            node -e 'const fs=require("node:fs");let h;try{h=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/app-health.json","utf8"));}catch{console.log(JSON.stringify({check:"health",passed:false,jsonReadable:false}));process.exit(1);}const ok=h?.ok===true,buildMatches=h?.build===process.env.GITHUB_SHA,modeMatches=h?.mode==="local-only-preview";console.log(JSON.stringify({check:"health",passed:ok&&buildMatches&&modeMatches,ok,buildMatches,modeMatches,expectedBuild:process.env.GITHUB_SHA,receivedBuild:/^[a-f0-9]{40}$/.test(h?.build)?h.build:"unexpected-or-missing",mode:["local-only-preview","account-preview"].includes(h?.mode)?h.mode:"unexpected-or-missing"}));if(!ok||!buildMatches||!modeMatches)process.exit(1);' || failed=1
+            node -e 'const fs=require("node:fs");let h;try{h=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/app-health.json","utf8"));}catch{console.log(JSON.stringify({check:"health",passed:false,jsonReadable:false}));process.exit(1);}const ok=h?.ok===true,buildMatches=h?.build===process.env.GITHUB_SHA,modeMatches=h?.mode==="local-only-preview",databaseReady=h?.database?.bound===true&&h?.database?.ready===true;console.log(JSON.stringify({check:"health",passed:ok&&buildMatches&&modeMatches&&databaseReady,ok,buildMatches,modeMatches,databaseReady,expectedBuild:process.env.GITHUB_SHA,receivedBuild:/^[a-f0-9]{40}$/.test(h?.build)?h.build:"unexpected-or-missing",mode:["local-only-preview","account-preview"].includes(h?.mode)?h.mode:"unexpected-or-missing"}));if(!ok||!buildMatches||!modeMatches||!databaseReady)process.exit(1);' || failed=1
           else
             echo '{"check":"health-http","passed":false}'
             failed=1
@@ -97,4 +129,4 @@ jobs:
             echo 'Verification failed; inspect the checks marked passed:false. No automatic rollback was performed.'
             exit 1
           fi
-          echo "Verified app runtime and disabled account route: $APP_URL. No account activation or migrations." >> "$GITHUB_STEP_SUMMARY"
+          echo "Verified app runtime, D1 account tables and disabled account route: $APP_URL. No account activation or migrations." >> "$GITHUB_STEP_SUMMARY"
