@@ -1,3 +1,4 @@
+# Retrigger deployment after account composition fixture correction (40febf2).
 name: Deploy Stock Watch frontend preview
 on:
   push:
