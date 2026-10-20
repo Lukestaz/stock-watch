@@ -157,7 +157,7 @@ test('Alpaca loader charges each history page and uses split versus raw adjustme
   let charges = 0; const urls = [];
   const load = createAlpacaLoader({key: 'fixture', secret: 'fixture', clock: () => initial,
     fetcher: async (url, options) => {
-      urls.push(new URL(url)); assert.equal(options.redirect, 'error');
+      urls.push(new URL(url)); assert.equal(options.redirect, 'manual');
       return Response.json({bars: [{t: '2023-11-13T20:00:00Z', c: 10, l: 9}],
         next_page_token: urls.length === 1 ? 'next' : null});
     }});
