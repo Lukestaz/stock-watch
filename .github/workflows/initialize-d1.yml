@@ -1,0 +1,45 @@
+name: Initialize Stock Watch D1
+on:
+  push:
+    branches: [feature/account-watchlist-sync]
+    paths: ['.github/workflows/initialize-d1.yml']
+permissions:
+  contents: read
+concurrency:
+  group: stock-watch-d1-migrations
+  cancel-in-progress: false
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: c4814713eafd41ae857b9a8097610df6
+      DATABASE_ID: 4cb54afc-8f2d-4f62-8b6b-7d59f343b938
+      DATABASE_NAME: stock-watch
+      WRANGLER_SEND_METRICS: 'false'
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: b71b0e006e737227e7e104ac016003821e882db0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify exact database target and access before migrations
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          curl --fail --silent --show-error -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database/$DATABASE_ID" -o "$RUNNER_TEMP/d1-info.json"
+          node -e 'const fs=require("node:fs");const c=JSON.parse(fs.readFileSync("worker/wrangler.d1.jsonc","utf8")).d1_databases.find(x=>x.binding==="DB");const i=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/d1-info.json","utf8"));if(c?.database_id!==process.env.DATABASE_ID||c?.database_name!==process.env.DATABASE_NAME||i.success!==true||i.result?.uuid!==process.env.DATABASE_ID||i.result?.name!==process.env.DATABASE_NAME)throw Error("D1 target mismatch; migrations stopped");'
+      - name: Apply the four pinned migrations to remote D1
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.150.0 d1 migrations apply DB --remote --config worker/wrangler.d1.jsonc
+      - name: Verify application tables and write-token column
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.150.0 d1 execute DB --remote --config worker/wrangler.d1.jsonc --json --command "SELECT name, sql FROM sqlite_master WHERE type='table' AND name IN ('users','watchlists','watchlist_entries','login_challenges','sessions','price_cache_entries','price_cache_budget') ORDER BY name;" > "$RUNNER_TEMP/d1-schema.json"
+          node -e 'const fs=require("node:fs");const r=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/d1-schema.json","utf8"));if(!Array.isArray(r)||r.some(x=>x.success!==true))throw Error("D1 schema query failed");const rows=r.flatMap(x=>x.results||[]);const names=rows.map(x=>x.name).sort();const expected=["login_challenges","price_cache_budget","price_cache_entries","sessions","users","watchlist_entries","watchlists"];if(JSON.stringify(names)!==JSON.stringify(expected)||!rows.find(x=>x.name==="watchlists")?.sql.includes("write_token"))throw Error("D1 schema verification failed");console.log("Verified tables: "+names.join(", "));'
+          echo 'Remote migration command completed; verified seven application tables and write_token. No Worker was deployed.' >> "$GITHUB_STEP_SUMMARY"

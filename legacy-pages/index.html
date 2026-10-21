@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Stock Watch has moved</title>
+<style>body{font:18px/1.6 system-ui,sans-serif;max-width:44rem;margin:3rem auto;padding:0 1rem;color:#172333;background:#f5f7fa}a,button{display:inline-block;padding:.6rem .9rem;margin:.3rem .3rem .3rem 0}button{font:inherit}small{display:block}#status{min-height:2em}</style>
+</head>
+<body>
+<main>
+<h1>Stock Watch has moved</h1>
+<p>The GitHub Pages dashboard is retired. Use the Cloudflare app for prices, Google sign-in and account watchlist sync.</p>
+<p><a href="https://stock-watch-app.lukestaz.workers.dev/" rel="noreferrer noopener">Open Stock Watch</a></p>
+<h2>Keep an old watchlist</h2>
+<p>Old device lists remain in this browser. This page does not upload, erase or automatically transfer them. Use the same browser/profile that held your old list.</p>
+<button type="button" id="export-device">Download this browser's old watchlist</button>
+<button type="button" id="export-shared" disabled>Download this link's shared snapshot</button>
+<p id="status" role="status" aria-live="polite"></p>
+<small>Downloads contain readable tickers and targets. Keep them private. A download is a backup, not an account import. Add entries explicitly in the new app; signing in does not import an old list. Update bookmarks and home-screen shortcuts to the new address.</small>
+<noscript><p>Enable JavaScript to download an old watchlist. You can open the new app using the link above without JavaScript on this page.</p></noscript>
+</main>
+<script type="module" src="./migration.mjs"></script>
+</body>
+</html>

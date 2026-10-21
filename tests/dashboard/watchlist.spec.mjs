@@ -5,7 +5,7 @@ const names={LUNR:'Example Lunar Listing Class A',FLY:'Example Flight Listing Co
 const saved=page=>page.evaluate(key=>JSON.parse(localStorage.getItem(key)),KEY);
 const row=(page,symbol)=>page.locator('.watchlist-row').filter({has:page.locator('strong').filter({hasText:new RegExp('^'+symbol+'$')})});
 async function ready(page){await expect(page.locator('#cards article')).toHaveCount(2);await expect(page.locator('#price-refresh-status')).toContainText('Checked');}
-async function refresh(page){await page.locator('.dashboard-nav > summary').click();await page.getByRole('button',{name:'Refresh data',exact:true}).click();}
+async function refresh(page){const button=page.locator('header #refresh');await expect(button).toHaveText('Refresh');await button.click();}
 async function editor(page){const panel=page.locator('.watchlist-tools');if(!await panel.evaluate(n=>n.open))await panel.locator(':scope > summary').click();}
 const testState=new WeakMap();
 test.beforeEach(async({page,context})=>{
@@ -56,6 +56,7 @@ for(const mode of ['Replace','Merge','Cancel'])test('import '+mode+' handles dup
  const expected=mode==='Replace'?incoming:mode==='Merge'?{version:1,stocks:[{ticker:'LUNR',target:9},{ticker:'FLY',target:15}]}:initial;
  await expect.poll(()=>saved(page)).toEqual(expected);
  await expect(page.locator('.watchlist-import')).toHaveCount(0);
+ await expect.poll(()=>new URL(page.url()).hash).toBe('');
  await page.reload();await expect.poll(()=>saved(page)).toEqual(expected);
 });
 for(const [label,ticker,target] of [['invalid ticker','BAD!',5],['negative target','NEW',-1]])test(label+' cannot overwrite saved watchlist',async({page})=>{

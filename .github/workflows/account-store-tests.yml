@@ -1,0 +1,25 @@
+name: Account database adapter tests
+on:
+  push:
+    branches: [main, feature/account-watchlist-sync]
+    paths: ['worker/src/account-*.mjs', 'worker/test/account-*.mjs', 'worker/migrations/**', 'tests/schema/sqlite_d1_bridge.py', '.github/workflows/account-store-tests.yml']
+  pull_request:
+    paths: ['worker/src/account-*.mjs', 'worker/test/account-*.mjs', 'worker/migrations/**', 'tests/schema/sqlite_d1_bridge.py', '.github/workflows/account-store-tests.yml']
+permissions:
+  contents: read
+jobs:
+  adapter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test account handler, adapter and identity core
+        run: node --test worker/test/account-*.test.mjs

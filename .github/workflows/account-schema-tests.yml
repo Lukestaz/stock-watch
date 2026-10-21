@@ -1,0 +1,28 @@
+name: Account schema regression tests
+on:
+  push:
+    branches: [main, feature/account-watchlist-sync]
+    paths:
+      - 'worker/migrations/**'
+      - 'tests/schema/**'
+      - '.github/workflows/account-schema-tests.yml'
+  pull_request:
+    paths:
+      - 'worker/migrations/**'
+      - 'tests/schema/**'
+      - '.github/workflows/account-schema-tests.yml'
+permissions:
+  contents: read
+jobs:
+  schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test isolated SQLite schema
+        run: python -m unittest discover -s tests/schema -p 'test_*.py' -v

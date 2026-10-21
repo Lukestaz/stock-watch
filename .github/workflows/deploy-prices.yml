@@ -1,71 +1,12 @@
-name: Deploy price lookup Worker
+name: Deprecated price deployment - use D1 workflow
 on:
   workflow_dispatch:
 permissions:
   contents: read
-concurrency:
-  group: deploy-stock-watch-prices
-  cancel-in-progress: false
 jobs:
-  deploy:
-    if: github.ref == 'refs/heads/main'
+  retired:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        shell: bash
-        working-directory: worker
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      WRANGLER_VERSION: '4.150.0'
-      PRICE_ENDPOINT: https://stock-watch-prices.lukestaz.workers.dev
-      WRANGLER_SEND_METRICS: 'false'
     steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Validate required secrets
-        env:
-          ALPACA_KEY: ${{ secrets.ALPACA_KEY }}
-          ALPACA_SECRET: ${{ secrets.ALPACA_SECRET }}
-        run: |
-          set -euo pipefail
-          node --input-type=module -e 'for(const k of ["CLOUDFLARE_API_TOKEN","CLOUDFLARE_ACCOUNT_ID","ALPACA_KEY","ALPACA_SECRET"])if(!process.env[k]){console.error("Missing Actions secret: "+k);process.exitCode=1;}'
-      - name: Unit tests
-        run: |
-          set -euo pipefail
-          node --test test/index.test.mjs
-          node --check scripts/verify-deployment.mjs
-      - name: Report pinned Wrangler version
-        run: |
-          set -euo pipefail
-          npx --yes "wrangler@$WRANGLER_VERSION" --version
-      - name: Deploy Worker; fail on any CLI error
-        run: |
-          set -euo pipefail
-          npx --yes "wrangler@$WRANGLER_VERSION" deploy 2>&1 | tee "$RUNNER_TEMP/stock-watch-deploy.log"
-      - name: Install provider secrets server-side
-        env:
-          ALPACA_KEY: ${{ secrets.ALPACA_KEY }}
-          ALPACA_SECRET: ${{ secrets.ALPACA_SECRET }}
-        run: |
-          set -euo pipefail
-          umask 077
-          SECRET_FILE=$(mktemp "$RUNNER_TEMP/stock-watch-secrets.XXXXXX.json")
-          export SECRET_FILE
-          trap 'rm -f "$SECRET_FILE"' EXIT
-          node -e 'require("node:fs").writeFileSync(process.env.SECRET_FILE,JSON.stringify({ALPACA_KEY:process.env.ALPACA_KEY,ALPACA_SECRET:process.env.ALPACA_SECRET}),{mode:0o600})'
-          npx --yes "wrangler@$WRANGLER_VERSION" secret bulk "$SECRET_FILE"
-      - name: Verify production health, AAPL data and browser CORS
-        run: |
-          set -euo pipefail
-          node scripts/verify-deployment.mjs
-          printf '### Worker deployment and endpoint checks passed\n\nEndpoint: `%s`\n\nWrangler: `%s`\n\nVerified health, AAPL history/price, timestamp boundaries and allowed-origin response header. This is not proof of a particular deployed revision or notification delivery. Dashboard integration already exists; alert rules were not changed.\n' "$PRICE_ENDPOINT" "$WRANGLER_VERSION" >> "$GITHUB_STEP_SUMMARY"
-      - name: Report deployment failure
-        if: failure()
-        run: |
-          printf '### Worker deployment or verification failed\n\nDo not treat the existing endpoint as proof this deployment succeeded. A failed deployment may already have uploaded code; no automatic rollback is performed. Inspect the first failing step. If account-subdomain access is denied, review scoped-token permissions rather than granting account-wide Admin.\n' >> "$GITHUB_STEP_SUMMARY"
+      - run: |
+          echo '::error::This deployment workflow is retired. Run Deploy D1 price cache Worker on main instead. Nothing was deployed.'
+          exit 1

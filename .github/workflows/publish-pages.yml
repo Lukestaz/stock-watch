@@ -1,13 +1,9 @@
-name: Publish dashboard
+name: Publish legacy dashboard retirement notice
 on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['site/**', '.github/workflows/publish-pages.yml']
-  workflow_run:
-    workflows: ['Monitor stock alerts', 'Refresh ticker catalogue']
-    types: [completed]
-    branches: [main]
+    paths: ['legacy-pages/**', 'tests/legacy-pages.test.mjs', '.github/workflows/publish-pages.yml']
 permissions:
   contents: read
   pages: write
@@ -17,27 +13,26 @@ concurrency:
   cancel-in-progress: false
 jobs:
   publish:
-    if: >-
-      github.ref == 'refs/heads/main' &&
-      (github.event_name != 'workflow_run' ||
-       (github.event.workflow_run.conclusion == 'success' &&
-        github.event.workflow_run.head_branch == 'main' &&
-        github.event.workflow_run.head_repository.full_name == github.repository))
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Check out current main including committed data
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.sha }}
           persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test local-only legacy snapshot exports
+        run: node --test tests/legacy-pages.test.mjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: site
-      - name: Deploy dashboard only
+          path: legacy-pages
+      - name: Replace old dashboard with retirement notice only
         id: deployment
         uses: actions/deploy-pages@v4

@@ -4,9 +4,40 @@
   "compatibility_date": "2026-10-17",
   "workers_dev": true,
   "preview_urls": false,
-  "vars": {"ALLOWED_ORIGIN": "https://lukestaz.github.io"},
+  "vars": {
+    "ALLOWED_ORIGIN": "https://lukestaz.github.io",
+    "PRICE_DAILY_LIMIT": "5000",
+    "PRICE_MINUTE_LIMIT": "100"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "stock-watch",
+      "database_id": "4cb54afc-8f2d-4f62-8b6b-7d59f343b938",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "triggers": {
+    "crons": [
+      "17 * * * *"
+    ]
+  },
   "ratelimits": [
-    {"name": "CLIENT_LIMIT", "namespace_id": "71017001", "simple": {"limit": 30, "period": 60}},
-    {"name": "UPSTREAM_LIMIT", "namespace_id": "71017002", "simple": {"limit": 30, "period": 60}}
+    {
+      "name": "CLIENT_LIMIT",
+      "namespace_id": "71017001",
+      "simple": {
+        "limit": 30,
+        "period": 60
+      }
+    },
+    {
+      "name": "UPSTREAM_LIMIT",
+      "namespace_id": "71017002",
+      "simple": {
+        "limit": 30,
+        "period": 60
+      }
+    }
   ]
 }

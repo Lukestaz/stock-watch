@@ -1,0 +1,63 @@
+name: Deploy D1 price cache Worker
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/deploy-price-cache.yml', 'worker/src/index.mjs', 'worker/src/price-cache*.mjs', 'worker/test/price-cache*.mjs', 'worker/test/index.test.mjs', 'worker/wrangler.jsonc']
+permissions:
+  contents: read
+concurrency:
+  group: deploy-stock-watch-prices
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: c4814713eafd41ae857b9a8097610df6
+      WRANGLER_SEND_METRICS: 'false'
+      CI: 'true'
+      PRICE_ENDPOINT: https://stock-watch-prices.lukestaz.workers.dev
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test price cache and HTTP handler
+        run: node --test worker/test/index.test.mjs worker/test/price-cache*.test.mjs
+      - name: Verify existing Worker and D1 cache schema
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          node -e 'const c=JSON.parse(require("node:fs").readFileSync("worker/wrangler.jsonc","utf8")),b=c.d1_databases?.find(x=>x.binding==="DB");if(c.name!=="stock-watch-prices"||b?.database_id!=="4cb54afc-8f2d-4f62-8b6b-7d59f343b938"||b?.database_name!=="stock-watch")throw Error("Deployment target mismatch");'
+          curl -fsS --max-time 20 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/stock-watch-prices" -o /dev/null
+          npx --yes wrangler@4.150.0 d1 execute DB --remote --config worker/wrangler.jsonc --command "SELECT symbol, kind, payload FROM price_cache_entries LIMIT 0; SELECT provider FROM price_cache_budget LIMIT 0;"
+      - name: Deploy current main revision without changing provider secrets
+        run: npx --yes wrangler@4.150.0 deploy --config worker/wrangler.jsonc --var "BUILD_SHA:$GITHUB_SHA"
+      - name: Verify revision and repeated AAPL snapshots
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const get = async path => {const r=await fetch(process.env.PRICE_ENDPOINT+path,{redirect:'error',signal:AbortSignal.timeout(60000)});assert.equal(r.status,200,'Price endpoint check failed');return r.json();};
+          let verified=false;
+          for(let i=0;i<6;i++){
+            try{const h=await get('/health');verified=h.ok===true&&h.mode==='d1-price-cache'&&h.build===process.env.GITHUB_SHA;if(verified)break;}catch{}
+            if(i<5)await new Promise(resolve=>setTimeout(resolve,5000));
+          }
+          assert.ok(verified,'Live revision or D1 health failed');
+          const a=await get('/v1/stock?symbol=AAPL'),b=await get('/v1/stock?symbol=AAPL');
+          for(const d of [a,b])assert.ok(d.symbol==='AAPL'&&Number.isFinite(d.price)&&d.price>0&&Array.isArray(d.history)&&d.history.length&&[d.cache?.history?.state,d.cache?.latest?.state].every(s=>['fresh','stale'].includes(s)),'AAPL snapshot invalid');
+          console.log(JSON.stringify({check:'price-build-and-two-snapshots',passed:true,build:process.env.GITHUB_SHA,sameSnapshot:a.cache.history.checkedAt===b.cache.history.checkedAt&&a.cache.latest.checkedAt===b.cache.latest.checkedAt}));
+          JS
+      - name: Report deployment failure
+        if: failure()
+        run: echo 'Deployment or verification failed. No automatic rollback was performed.' >> "$GITHUB_STEP_SUMMARY"
