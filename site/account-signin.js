@@ -1,21 +1,33 @@
+import './navigation.js';
 import {accountSession} from './account-session.mjs';
 const CLIENT_ID='19866673111-hg5958bvoiqoa5crrt0jmalvh1mssfvk.apps.googleusercontent.com';
 const APP_ORIGIN='https://stock-watch-app.lukestaz.workers.dev';
 if(location.origin===APP_ORIGIN)mount();else accountSession.set('guest');
 function mount(){
- const header=document.querySelector('header');if(!header)return;
+ const header=document.querySelector('header'),menu=document.querySelector('.dashboard-nav'),pop=document.querySelector('.nav-popover');if(!header||!menu||!pop)return;
  const button=text=>{const b=document.createElement('button');b.type='button';b.textContent=text;return b;};
- const toggle=button('Sign in'),retry=button('Start Google sign-in'),logout=button('Sign out'),recheck=button('Check session');
- toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-controls','account-panel');(header.querySelector('.nav-actions')||header).append(toggle);
- const panel=document.createElement('section');panel.id='account-panel';panel.hidden=true;panel.setAttribute('aria-label','Account sign-in');panel.style.cssText='margin:12px 0;padding:14px;border:1px solid #52647c;border-radius:10px';
+ const controls=document.createElement('section');controls.className='account-menu-controls';controls.setAttribute('aria-label','Account controls');controls.style.cssText='border-bottom:1px solid #52647c;padding-bottom:6px;margin-bottom:4px';
+ const accountState=document.createElement('p');accountState.id='account-menu-status';accountState.setAttribute('role','status');accountState.setAttribute('aria-live','polite');accountState.style.cssText='font-size:.8rem;margin:4px 8px;color:#b5c4da';
+ const toggle=button('Sign in with Google'),retry=button('Start Google sign-in'),logout=button('Sign out'),recheck=button('Check session'),close=button('Close account');
+ toggle.id='account-menu-entry';logout.id='account-menu-logout';toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-controls','account-panel');controls.append(accountState,toggle,logout);pop.prepend(controls);
+ const panel=document.createElement('section');panel.id='account-panel';panel.hidden=true;panel.tabIndex=-1;panel.setAttribute('aria-label','Account sign-in');panel.style.cssText='margin:12px 0;padding:14px;border:1px solid #52647c;border-radius:10px';
  const status=document.createElement('p');status.setAttribute('role','status');status.setAttribute('aria-live','polite');
  const googleButton=document.createElement('div');googleButton.style.cssText='min-height:44px;max-width:100%;overflow:auto';
  const note=document.createElement('p');note.className='muted';note.textContent='Account edits save to the cloud. Guest edits stay on this device. Neither list is automatically copied into the other. Scheduled alerts are unchanged.';
- retry.hidden=logout.hidden=true;panel.append(status,googleButton,retry,logout,recheck,note);header.after(panel);
+ retry.hidden=logout.hidden=true;panel.append(status,googleButton,retry,recheck,close,note);header.after(panel);
  let available=false,signedIn=false,busy=false,sdkPromise,generation=0,channel;try{channel=new BroadcastChannel('stock-watch-session');}catch{}
  const message=text=>{status.textContent=text;};
  const clearGoogle=()=>{generation++;googleButton.replaceChildren();};
- function session(value){signedIn=value;toggle.textContent=value?'Account':'Sign in';logout.hidden=!value;retry.hidden=value||!available;accountSession.set(value?'signed-in':'guest');}
+ function renderSession(value){
+  if(value==='signed-in')signedIn=true;else if(value==='guest')signedIn=false;
+  accountState.textContent=value==='signed-in'?'Signed in · cloud watchlist':value==='guest'?'Guest · this device':value==='checking'?'Checking account…':'Session unavailable';
+  toggle.textContent=signedIn?'Account':'Sign in with Google';logout.hidden=!signedIn;retry.hidden=value!=='guest'||!available;
+ }
+ accountSession.subscribe(renderSession);
+ function session(value){renderSession(value?'signed-in':'guest');accountSession.set(value?'signed-in':'guest');}
+ function openPanel(){menu.open=false;panel.hidden=false;toggle.setAttribute('aria-expanded','true');panel.focus();}
+ function closePanel(){panel.hidden=true;toggle.setAttribute('aria-expanded','false');menu.querySelector(':scope > summary')?.focus();}
+ close.onclick=closePanel;panel.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closePanel();}});
  const api=(path,body)=>fetch('/api/v1/'+path,{method:body===undefined?'GET':'POST',credentials:'same-origin',cache:'no-store',redirect:'error',headers:body===undefined?{Accept:'application/json'}:{'Content-Type':'application/json',Accept:'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(15000)});
  function loadGoogle(){
   if(window.google?.accounts?.id)return Promise.resolve(window.google.accounts.id);if(sdkPromise)return sdkPromise;
@@ -48,9 +60,9 @@ function mount(){
    }});id.renderButton(googleButton,{type:'standard',theme:'outline',size:'large',text:'signin_with',width:240});message('Use the Google button below.');retry.textContent='Restart Google sign-in';
   }catch{clearGoogle();message('Sign-in unavailable. Try again later.');}finally{busy=false;retry.disabled=false;}
  }
- toggle.onclick=()=>{panel.hidden=!panel.hidden;toggle.setAttribute('aria-expanded',String(!panel.hidden));if(!panel.hidden&&!available)void checkSession();else if(!panel.hidden&&!signedIn&&!googleButton.childElementCount)void begin();};
+ toggle.onclick=async()=>{openPanel();if(!available)await checkSession();if(available&&!signedIn&&!googleButton.childElementCount)void begin();};
  retry.onclick=()=>void begin();recheck.onclick=()=>void checkSession();
- logout.onclick=async()=>{if(busy||!accountSession.canChange())return;busy=true;logout.disabled=true;accountSession.set('checking');
+ logout.onclick=async()=>{if(busy||!accountSession.canChange())return;openPanel();busy=true;logout.disabled=true;accountSession.set('checking');
   try{const r=await api('auth/logout',{});if(!r.ok||(await r.json()).ok!==true)throw Error();clearGoogle();session(false);window.google?.accounts?.id?.disableAutoSelect();message('Signed out. Showing this device’s guest list.');channel?.postMessage('changed');}
   catch{accountSession.set('unavailable');message('Could not confirm sign-out. Check session or retry sign-out.');}finally{busy=false;logout.disabled=false;}
  };
