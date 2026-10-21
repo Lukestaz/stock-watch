@@ -56,7 +56,6 @@ jobs:
           shutil.copytree('site',p/'static',dirs_exist_ok=True)
           shutil.copytree('worker/src',p/'src',dirs_exist_ok=True)
           f=p/'static/market-data.js';s=f.read_text();old='https://stock-watch-prices.lukestaz.workers.dev';assert old in s;f.write_text(s.replace(old,'/api'))
-          f=p/'static/index.html';s=f.read_text();m='<main id="cards">';assert m in s;f.write_text(s.replace(m,'<p role="status">Stock Watch: Google sign-in and account watchlist sync are enabled. Guest edits stay on this device. Account alerts are not enabled.</p>'+m,1))
           d=json.loads(Path('worker/wrangler.d1.jsonc').read_text());b=d['d1_databases'];assert d['name']=='stock-watch-app' and len(b)==1 and b[0]['binding']=='DB' and b[0]['database_name']=='stock-watch' and b[0]['database_id']=='4cb54afc-8f2d-4f62-8b6b-7d59f343b938'
           (p/'wrangler.jsonc').write_text(json.dumps({'name':'stock-watch-app','main':'src/account-runtime.mjs','compatibility_date':'2026-10-19','workers_dev':True,'preview_urls':False,'d1_databases':[{k:b[0][k] for k in ('binding','database_name','database_id')}],'vars':{'ACCOUNTS_ENABLED':'true','APP_ORIGIN':os.environ['APP_URL'],'GOOGLE_CLIENT_ID':'19866673111-hg5958bvoiqoa5crrt0jmalvh1mssfvk.apps.googleusercontent.com'},'ratelimits':[{'name':'ACCOUNT_LIMIT','namespace_id':'1986667311','simple':{'limit':30,'period':60}}],'assets':{'directory':'./static','binding':'ASSETS','run_worker_first':True},'services':[{'binding':'PRICES','service':'stock-watch-prices'}]}))
           PY
@@ -121,7 +120,7 @@ jobs:
           check('health-build-account-mode-database',healthPassed);
           try {
             const r = await get('/'), html = await r.text();
-            check('frontend-signin-and-status',r.ok && html.includes('./account-signin.js') && html.includes('Stock Watch: Google sign-in and account watchlist sync are enabled.'));
+            check('frontend-signin-without-release-banner',r.ok && html.includes('./account-signin.js') && html.includes('<main id="cards">') && !html.includes('Stock Watch: Google sign-in and account watchlist sync are enabled.'));
             const script = await get('/account-signin.js');
             check('signin-script',script.ok && (await script.text()).includes('19866673111-hg5958bvoiqoa5crrt0jmalvh1mssfvk.apps.googleusercontent.com'));
           } catch { check('frontend-request',false); }
