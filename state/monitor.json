@@ -5,32 +5,32 @@
         "near": true,
         "target": true
       },
-      "history_day": "2026-10-21",
-      "last": "2026-10-21T21:17:00Z"
+      "history_day": "2026-10-22",
+      "last": "2026-10-21T23:55:00Z"
     },
     "FLY": {
       "armed": {
         "near": true,
         "target": true
       },
-      "history_day": "2026-10-21",
-      "last": "2026-10-21T21:09:00Z"
+      "history_day": "2026-10-22",
+      "last": "2026-10-21T23:54:00Z"
     },
     "RKLB": {
       "armed": {
         "near": true,
         "target": true
       },
-      "history_day": "2026-10-21",
-      "last": "2026-10-21T21:19:00Z"
+      "history_day": "2026-10-22",
+      "last": "2026-10-21T23:57:00Z"
     },
     "SPCX": {
       "armed": {
         "near": true,
         "target": true
       },
-      "history_day": "2026-10-21",
-      "last": "2026-10-21T21:19:00Z"
+      "history_day": "2026-10-22",
+      "last": "2026-10-21T23:57:00Z"
     }
   },
   "events": {}
