@@ -2,11 +2,11 @@
   "stocks": {
     "LUNR": {
       "armed": {
-        "near": true,
+        "near": false,
         "target": true
       },
       "history_day": "2026-10-22",
-      "last": "2026-10-21T23:55:00Z"
+      "last": "2026-10-22T17:40:00Z"
     },
     "FLY": {
       "armed": {
@@ -14,7 +14,7 @@
         "target": true
       },
       "history_day": "2026-10-22",
-      "last": "2026-10-21T23:54:00Z"
+      "last": "2026-10-22T17:40:00Z"
     },
     "RKLB": {
       "armed": {
@@ -22,7 +22,7 @@
         "target": true
       },
       "history_day": "2026-10-22",
-      "last": "2026-10-21T23:57:00Z"
+      "last": "2026-10-22T17:40:00Z"
     },
     "SPCX": {
       "armed": {
@@ -30,8 +30,22 @@
         "target": true
       },
       "history_day": "2026-10-22",
-      "last": "2026-10-21T23:57:00Z"
+      "last": "2026-10-22T17:40:00Z"
     }
   },
-  "events": {}
+  "events": {
+    "LUNR-near-2026-10-22T16:57:00Z": {
+      "symbol": "LUNR",
+      "kind": "near",
+      "target": 10,
+      "low": 10.32,
+      "time": "2026-10-22T16:57:00Z",
+      "email": "accepted",
+      "whatsapp": "skipped",
+      "attempts": {
+        "email": 1,
+        "whatsapp": 0
+      }
+    }
+  }
 }
