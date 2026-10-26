@@ -2,35 +2,35 @@
   "stocks": {
     "LUNR": {
       "armed": {
-        "near": false,
+        "near": true,
         "target": true
       },
-      "history_day": "2026-10-23",
-      "last": "2026-10-23T23:34:00Z"
+      "history_day": "2026-10-26",
+      "last": "2026-10-26T18:57:00Z"
     },
     "FLY": {
       "armed": {
         "near": true,
         "target": true
       },
-      "history_day": "2026-10-23",
-      "last": "2026-10-23T23:18:00Z"
+      "history_day": "2026-10-26",
+      "last": "2026-10-26T18:57:00Z"
     },
     "RKLB": {
       "armed": {
         "near": true,
         "target": true
       },
-      "history_day": "2026-10-23",
-      "last": "2026-10-23T23:32:00Z"
+      "history_day": "2026-10-26",
+      "last": "2026-10-26T18:57:00Z"
     },
     "SPCX": {
       "armed": {
         "near": true,
         "target": true
       },
-      "history_day": "2026-10-23",
-      "last": "2026-10-23T23:34:00Z"
+      "history_day": "2026-10-26",
+      "last": "2026-10-26T18:57:00Z"
     }
   },
   "events": {
