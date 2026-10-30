@@ -1,0 +1,35 @@
+name: Offline notification transport tests
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'feature/account-email-alerts']
+    paths: ['scripts/notifications.py', 'scripts/notification_test.py', 'scripts/test_notifications*.py', 'scripts/alert_formatting.py', '.github/workflows/notification-transport-tests.yml']
+  pull_request:
+    branches: [main]
+    paths: ['scripts/notifications.py', 'scripts/notification_test.py', 'scripts/test_notifications*.py', 'scripts/alert_formatting.py', '.github/workflows/notification-transport-tests.yml']
+permissions:
+  contents: read
+jobs:
+  transport:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run mocked transports with network connections blocked
+        run: |
+          python - <<'PY'
+          import sys, unittest
+          from unittest.mock import patch
+          sys.path.insert(0, 'scripts')
+          with patch('socket.socket.connect', side_effect=RuntimeError('Network disabled')), patch('socket.create_connection', side_effect=RuntimeError('Network disabled')):
+              suite = unittest.defaultTestLoader.discover('scripts', pattern='test_notifications*.py')
+              if suite.countTestCases() < 21:
+                  raise RuntimeError('Expected legacy and formatted transport tests')
+              result = unittest.TextTestRunner(verbosity=2).run(suite)
+          sys.exit(0 if result.wasSuccessful() else 1)
+          PY

@@ -10,9 +10,10 @@ def required(names):
     if any(not os.environ.get(name) for name in names):
         raise NotificationError('not_sent','missing_configuration')
 
-def send_email(text,subject='Space Stock Watch: review threshold'):
+def send_email(text,subject='Space Stock Watch: review threshold',*,html=None):
     required(['GMAIL_USER','GMAIL_APP_PASSWORD','ALERT_TO_EMAIL'])
     msg=EmailMessage();msg['From']=os.environ['GMAIL_USER'];msg['To']=os.environ['ALERT_TO_EMAIL'];msg['Subject']=subject;msg.set_content(text)
+    if html is not None:msg.add_alternative(html,subtype='html')
     smtp=None;submitted=False
     try:
         smtp=smtplib.SMTP_SSL('smtp.gmail.com',465,context=ssl.create_default_context(),timeout=30)
@@ -44,3 +45,17 @@ def send_whatsapp(text):
     if not re.search(r'\b(?:queued|sent)\b',answer):
         raise NotificationError('outcome_unknown','gateway_response_unrecognised',True)
     return 'accepted'
+
+def send_formatted_alert(event,channel):
+    """Send only the explicitly selected channel to existing configured recipients.
+
+    Caller owns consent, target freshness, expiry, deduplication and retry policy.
+    No automatic fallback to another channel; acceptance is not delivery proof.
+    """
+    if channel not in ('email','whatsapp'):
+        raise ValueError('Invalid notification channel')
+    from alert_formatting import format_alert
+    message=format_alert(event)
+    if channel=='email':
+        return send_email(message['text'],subject=message['subject'],html=message['html'])
+    return send_whatsapp(message['whatsapp'])

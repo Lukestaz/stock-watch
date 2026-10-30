@@ -1,0 +1,35 @@
+name: Alert message formatting tests
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'feature/account-email-alerts']
+    paths: ['scripts/alert_formatting.py', 'scripts/test_alert_formatting.py', '.github/workflows/alert-formatting-tests.yml']
+  pull_request:
+    branches: [main]
+    paths: ['scripts/alert_formatting.py', 'scripts/test_alert_formatting.py', '.github/workflows/alert-formatting-tests.yml']
+permissions:
+  contents: read
+jobs:
+  formatting:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test formatting with network connections blocked
+        run: |
+          python - <<'PY'
+          import sys, unittest
+          from unittest.mock import patch
+          sys.path.insert(0, 'scripts')
+          suite = unittest.defaultTestLoader.discover('scripts', pattern='test_alert_formatting.py')
+          if suite.countTestCases() == 0:
+              raise RuntimeError('Formatting tests not discovered')
+          with patch('socket.socket.connect', side_effect=RuntimeError('Network disabled')), patch('socket.create_connection', side_effect=RuntimeError('Network disabled')):
+              result = unittest.TextTestRunner(verbosity=2).run(suite)
+          sys.exit(0 if result.wasSuccessful() else 1)
+          PY
