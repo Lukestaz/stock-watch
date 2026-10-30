@@ -1,0 +1,72 @@
+name: Target editor and alert regression tests
+on:
+  workflow_dispatch:
+  push:
+    branches: ['feature/inline-targets-alert-consistency']
+    paths: ['site/**', 'scripts/**', 'worker/src/account-*.mjs', 'worker/test/account-*.test.mjs', 'tests/dashboard/**', '.github/workflows/target-editor-tests.yml']
+permissions:
+  contents: read
+concurrency:
+  group: target-editor-tests-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  offline-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run target rule and mocked monitor tests; no sending
+        run: |
+          python -m unittest discover -s scripts -p 'test_alert_rules.py' -v
+          python -m unittest discover -s scripts -p 'test_monitor_integration.py' -v
+      - name: Run account regressions and editor syntax checks
+        run: |
+          node --test worker/test/account-*.test.mjs
+          node --check site/inline-targets.js
+          node --check tests/dashboard/inline-targets.spec.mjs
+  browser-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: tests/dashboard
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned dashboard test runner
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+      - name: Install desktop and mobile test browsers
+        run: npx playwright install --with-deps chromium webkit
+      - name: Run full synthetic-data dashboard suite
+        env:
+          CI: 'true'
+          PLAYWRIGHT_HTML_OPEN: never
+          PLAYWRIGHT_JSON_OUTPUT_NAME: results.json
+        run: npm test -- --reporter=list,html,json
+      - name: Upload synthetic test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: target-editor-browser-results
+          path: |
+            tests/dashboard/results.json
+            tests/dashboard/playwright-report/
+            tests/dashboard/test-results/
+          retention-days: 7
+          if-no-files-found: warn
