@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "workflow": "Target editor and alert regression tests",
+  "sourceBranch": "feature/inline-targets-alert-consistency",
+  "testedCommit": "d1faacc5acc49906d81312a0ef69ae8ea69b0615",
+  "runId": "41018533648",
+  "runNumber": "5",
+  "runAttempt": "1",
+  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/41018533648",
+  "generatedAt": "2026-10-30T07:13:01.986Z",
+  "jobs": {
+    "offline": "success",
+    "browser": "success"
+  },
+  "outcome": "passed",
+  "reportState": "available",
+  "browserCounts": {
+    "passed": 46,
+    "failed": 0,
+    "flaky": 0,
+    "skipped": 2
+  },
+  "offlineCounts": null,
+  "reportErrorCount": 0,
+  "failures": []
+}
