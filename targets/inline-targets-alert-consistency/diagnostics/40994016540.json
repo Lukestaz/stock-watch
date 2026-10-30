@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "kind": "synthetic_browser_failure_diagnostics",
+  "sourceBranch": "feature/inline-targets-alert-consistency",
+  "testedCommit": "3b1c32128b2c8c795e0b41be0b952a955983debf",
+  "sourceRunId": "40994016540",
+  "sourceRunUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/40994016540",
+  "generatedAt": "2026-10-30T02:56:34.466Z",
+  "failures": [
+    {
+      "browser": "chromium-desktop",
+      "title": "inline account save locks during PUT and persists without touching guest list",
+      "status": "unexpected",
+      "errors": [
+        "Error: expect(locator).toContainText(expected) failed\n\nLocator: locator('#cards article').filter({ has: getByRole('heading', { name: 'LUNR', exact: true }) }).locator('.stock-target')\nExpected substring: \"$12.25\"\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n  - Expect \"toContainText\" locator('#cards article').filter({ has: getByRole('heading', { name: 'LUNR', exact: true }) }).locator('.stock-target') with timeout 5000ms\n  - waiting for locator('#cards article').filter({ has: getByRole('heading', { name: 'LUNR', exact: true }) }).locator('.stock-target')\n\n\n  54 |  await expect.poll(()=>typeof state.release).toBe('function');state.hold=false;state.release();state.release=null;\n  55 |  await expect(page.locator('.watchlist-message')).toContainText('Saved to account.');await page.reload();\n> 56 |  await expect(card(page).locator('.stock-target')).toContainText('$12.25');expect(state.puts).toHaveLength(1);\n     |                                                    ^\n  57 |  expect(await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),KEY)).toEqual(guest);\n  58 | });\n  59 | for(const [status,label] of [[409,'Account or watchlist changed'],[401,'Session expired']])test('inline '+status+' preserves draft and prevents another write',async({page})=>{\n    at /home/runner/work/stock-watch/stock-watch/tests/dashboard/inline-account.spec.mjs:56:52"
+      ]
+    },
+    {
+      "browser": "chromium-desktop",
+      "title": "forced account transition discards previous inline draft and private cards",
+      "status": "unexpected",
+      "errors": [
+        "Error: expect(locator).toContainText(expected) failed\n\nLocator: locator('#cards article').filter({ has: getByRole('heading', { name: 'FLY', exact: true }) }).locator('.stock-target')\nExpected substring: \"$20.00\"\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n  - Expect \"toContainText\" locator('#cards article').filter({ has: getByRole('heading', { name: 'FLY', exact: true }) }).locator('.stock-target') with timeout 5000ms\n  - waiting for locator('#cards article').filter({ has: getByRole('heading', { name: 'FLY', exact: true }) }).locator('.stock-target')\n\n\n  84 |  state.account='fixture-B';state.revision=0;state.stocks=[{symbol:'FLY',target:20,alertsEnabled:false}];\n  85 |  await page.evaluate(async()=>{const {accountSession}=await import('/account-session.mjs');accountSession.set('signed-in');});\n> 86 |  await expect(card(page,'FLY').locator('.stock-target')).toContainText('$20.00');await expect(card(page)).toHaveCount(0);\n     |                                                          ^\n  87 |  expect(state.puts).toHaveLength(0);await expect(page.locator('.watchlist-row input')).toHaveValue('20');\n  88 | });\n  89 |\n    at /home/runner/work/stock-watch/stock-watch/tests/dashboard/inline-account.spec.mjs:86:58"
+      ]
+    }
+  ],
+  "reportErrors": []
+}
