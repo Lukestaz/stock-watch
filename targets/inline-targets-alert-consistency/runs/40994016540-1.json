@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "workflow": "Target editor and alert regression tests",
+  "sourceBranch": "feature/inline-targets-alert-consistency",
+  "testedCommit": "3b1c32128b2c8c795e0b41be0b952a955983debf",
+  "runId": "40994016540",
+  "runNumber": "3",
+  "runAttempt": "1",
+  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/40994016540",
+  "generatedAt": "2026-10-30T02:52:09.509Z",
+  "jobs": {
+    "offline": "success",
+    "browser": "failure"
+  },
+  "outcome": "failed",
+  "reportState": "available",
+  "browserCounts": {
+    "passed": 44,
+    "failed": 2,
+    "flaky": 0,
+    "skipped": 2
+  },
+  "offlineCounts": null,
+  "reportErrorCount": 0,
+  "failures": [
+    {
+      "browser": "chromium-desktop",
+      "title": "inline account save locks during PUT and persists without touching guest list",
+      "status": "unexpected"
+    },
+    {
+      "browser": "chromium-desktop",
+      "title": "forced account transition discards previous inline draft and private cards",
+      "status": "unexpected"
+    }
+  ]
+}
