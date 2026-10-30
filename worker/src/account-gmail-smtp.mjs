@@ -3,12 +3,13 @@ const encoder=new TextEncoder();
 const mailbox=v=>typeof v==='string'&&v.length<=254&&/^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$/.test(v)&&!v.includes('..');
 const base64=text=>{const bytes=encoder.encode(text);let out='';for(const b of bytes)out+=String.fromCharCode(b);return btoa(out);};
 class Rejected extends Error{}
-export function createGmailSmtpTransport({enabled=false,connect,username,appPassword,timeoutMs=15000}={}){
+export function createGmailSmtpTransport({enabled=false,connect,username,appPassword,timeoutMs=15000,purpose='verification'}={}){
  const password=typeof appPassword==='string'?appPassword.replaceAll(' ',''):'';
- const configured=enabled===true&&typeof connect==='function'&&mailbox(username)&&/^[A-Za-z]{16}$/.test(password)&&Number.isInteger(timeoutMs)&&timeoutMs>=10&&timeoutMs<=30000;
+ const subject=purpose==='price-alert'?'[Stock Watch] Price alert':'[Stock Watch] Verify your email address';
+ const configured=['verification','price-alert'].includes(purpose)&&enabled===true&&typeof connect==='function'&&mailbox(username)&&/^[A-Za-z]{16}$/.test(password)&&Number.isInteger(timeoutMs)&&timeoutMs>=10&&timeoutMs<=30000;
  return {configured,async send(message){
   if(!configured)return {outcome:'not_sent',category:'missing_configuration'};
-  if(!message||message.from!==username||!mailbox(message.to)||message.subject!=='[Stock Watch] Verify your email address'||typeof message.text!=='string'||encoder.encode(message.text).length>8192)return {outcome:'not_sent',category:'invalid_message'};
+  if(!message||message.from!==username||!mailbox(message.to)||message.subject!==subject||typeof message.text!=='string'||encoder.encode(message.text).length>8192)return {outcome:'not_sent',category:'invalid_message'};
   let socket,reader,writer,timer,submitted=false,timedOut=false;
   const close=()=>{try{Promise.resolve(socket?.close()).catch(()=>{});}catch{}};
   const guard=()=>{if(timedOut)throw Error();};
