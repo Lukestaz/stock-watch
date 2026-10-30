@@ -1,5 +1,6 @@
 import os,json,urllib.request,urllib.parse,math
 from notifications import send_email,send_whatsapp
+from alert_rules import reconcile_target,match_kind,rearm,event_is_current
 from datetime import datetime,timedelta,timezone
 from pathlib import Path
 
@@ -35,6 +36,10 @@ def save():
     statepath.parent.mkdir(exist_ok=True)
     statepath.write_text(json.dumps(state,indent=2))
 
+# Reconcile even when provider credentials are absent; delivery must reject old targets.
+for symbol,target in targets.items():
+    state['stocks'][symbol]=reconcile_target(state['stocks'].get(symbol,{}),target)
+
 public={'updated':now.isoformat(),'status':'OK' if key and secret else 'Alpaca credentials missing','email':'configured, delivery unverified' if email_ready else 'not configured','whatsapp':'configured, delivery unverified' if wa_ready else 'not configured','stocks':[]}
 end=(now-timedelta(minutes=16)).isoformat()
 errors=False
@@ -43,24 +48,24 @@ for symbol,target in targets.items():
     display['target']=target
     if not key or not secret:
         display['status']='Credentials missing';public['stocks'].append(display);continue
-    s=state['stocks'].setdefault(symbol,{'armed':{'near':True,'target':True}})
+    s=state['stocks'][symbol]
     try:
         start=s.get('last') or (now-timedelta(minutes=45)).isoformat()
         start=max(start,(now-timedelta(days=7)).isoformat())
         data=bars(symbol,start,end,'1Min','raw')
         for b in data:
             if b['t']<=s.get('last',''):continue
-            if not all(isinstance(b.get(x),(int,float)) and math.isfinite(b[x]) and b[x]>0 for x in ['l','c']):continue
+            if not all(type(b.get(x)) in (int,float) and math.isfinite(b[x]) and b[x]>0 for x in ['l','c']):continue
+            if b['l']>b['c']:continue
             when=datetime.fromisoformat(b['t'].replace('Z','+00:00'))
             age=(now-when).total_seconds()
             if age<900:continue
             s['last']=b['t']
-            if b['c']>target*1.07:s['armed']['near']=True
-            if b['c']>target*1.02:s['armed']['target']=True
-            kind='target' if b['l']<=target else 'near' if b['l']<=target*1.05 else None
+            s['armed']=rearm(s['armed'],b['c'],target)
+            kind=match_kind(b['l'],target)
             if kind and s['armed'].get(kind) and age<=3600:
-                eid=symbol+'-'+kind+'-'+b['t']
-                state['events'].setdefault(eid,{'symbol':symbol,'kind':kind,'target':target,'low':b['l'],'time':b['t'],'email':'pending','whatsapp':'pending' if kind=='target' else 'skipped','attempts':{'email':0,'whatsapp':0}})
+                eid=symbol+'-r'+str(s['target_revision'])+'-'+kind+'-'+b['t']
+                state['events'].setdefault(eid,{'symbol':symbol,'kind':kind,'target':target,'target_revision':s['target_revision'],'low':b['l'],'time':b['t'],'email':'pending','whatsapp':'pending' if kind=='target' else 'skipped','attempts':{'email':0,'whatsapp':0}})
                 s['armed'][kind]=False
                 if kind=='target':s['armed']['near']=False
             display.update(price=b['c'],time=b['t'],status='delayed SIP')
@@ -75,6 +80,11 @@ for symbol,target in targets.items():
     public['stocks'].append(display)
 save()
 for eid,e in state['events'].items():
+    if not event_is_current(e,targets,state['stocks']):
+        for channel in ['email','whatsapp']:
+            if e.get(channel)=='pending':e[channel]='superseded'
+        save()
+        continue
     text=f"{e['symbol']} {e['kind']} review level: target ${e['target']}; observed low ${e['low']}; market timestamp {e['time']}. Consolidated data delayed at least 15 minutes. Check current price in Tiger. Not an automatic buy instruction."
     for channel,ready in [('email',email_ready),('whatsapp',wa_ready)]:
         if e[channel]!='pending' or not ready or e['attempts'][channel]>=3:continue
