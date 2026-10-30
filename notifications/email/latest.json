@@ -1,21 +1,15 @@
 {
   "schemaVersion": 1,
   "channel": "email",
-  "testId": "39163153835/1",
-  "runId": "39163153835",
+  "testId": "41025090766/1",
+  "runId": "41025090766",
   "runAttempt": "1",
-  "testedCommit": "1dfd96c64536ddd781e474b65cd71cf82ed5b7be",
-  "generatedAt": "2026-10-18T20:24:48.142Z",
-  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/39163153835",
+  "testedCommit": "4f28c89ee5298b9b983ad590068ee514a2bb2ec7",
+  "generatedAt": "2026-10-30T08:14:39.163Z",
+  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/41025090766",
   "jobResult": "success",
   "outcome": "accepted",
   "errorCategory": null,
   "sendAttempted": true,
-  "receipt": "confirmed",
-  "receiptConfirmation": {
-    "source": "user_confirmation_in_conversation",
-    "reportedAt": "2026-10-19T09:26:00+13:00",
-    "evidence": "User confirmed both workflow success and message arrival for email and WhatsApp.",
-    "scope": "Receipt of this manual test message only; not verification of scheduled price-threshold alerts."
-  }
+  "receipt": "unverified"
 }

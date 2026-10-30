@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "channel": "email",
+  "testId": "41025090766/1",
+  "runId": "41025090766",
+  "runAttempt": "1",
+  "testedCommit": "4f28c89ee5298b9b983ad590068ee514a2bb2ec7",
+  "generatedAt": "2026-10-30T08:14:39.163Z",
+  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/41025090766",
+  "jobResult": "success",
+  "outcome": "accepted",
+  "errorCategory": null,
+  "sendAttempted": true,
+  "receipt": "unverified"
+}
