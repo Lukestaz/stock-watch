@@ -70,3 +70,86 @@ jobs:
             tests/dashboard/test-results/
           retention-days: 7
           if-no-files-found: warn
+  publish-branch-summary:
+    needs: [offline-regressions, browser-regressions]
+    if: >-
+      always() && github.ref == 'refs/heads/feature/inline-targets-alert-consistency' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    concurrency:
+      group: dashboard-results-publisher
+      cancel-in-progress: false
+    steps:
+      - name: Download this run's synthetic results
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: target-editor-browser-results
+          path: ${{ runner.temp }}/target-editor-results
+      - name: Publish bounded branch-specific summary
+        uses: actions/github-script@v7
+        env:
+          RESULT_FILE: ${{ runner.temp }}/target-editor-results/results.json
+          OFFLINE_RESULT: ${{ needs.offline-regressions.result }}
+          BROWSER_RESULT: ${{ needs.browser-regressions.result }}
+        with:
+          script: |
+            const fs = require('node:fs');
+            const {owner,repo} = context.repo;
+            const branch = 'feature/inline-targets-alert-consistency';
+            if (context.ref !== 'refs/heads/' + branch || !['push','workflow_dispatch'].includes(context.eventName)) throw Error('Untrusted source');
+            let report = null, reportState = 'missing', counts = null, failures = [];
+            try {
+              if (fs.statSync(process.env.RESULT_FILE).size > 5 * 1024 * 1024) throw Error('Oversized report');
+              report = JSON.parse(fs.readFileSync(process.env.RESULT_FILE,'utf8'));
+              for (const key of ['expected','unexpected','flaky','skipped']) {
+                if (!Number.isSafeInteger(report.stats?.[key]) || report.stats[key] < 0) throw Error('Invalid counts');
+              }
+              if (!Array.isArray(report.suites) || (report.errors !== undefined && !Array.isArray(report.errors))) throw Error('Invalid report');
+              counts = {passed:report.stats.expected,failed:report.stats.unexpected,flaky:report.stats.flaky,skipped:report.stats.skipped};
+              const queue = [...report.suites];
+              let visited = 0;
+              while (queue.length) {
+                if (++visited > 10000) throw Error('Oversized suite tree');
+                const suite = queue.pop();
+                for (const spec of suite.specs || []) for (const test of spec.tests || []) {
+                  if (['unexpected','flaky'].includes(test.status) && failures.length < 20) failures.push({browser:String(test.projectName || test.projectId || 'unknown').slice(0,100),title:String(spec.title || '').slice(0,240),status:test.status});
+                }
+                queue.push(...(suite.suites || []));
+              }
+              reportState = 'available';
+            } catch (error) {
+              report = null; counts = null; failures = [];
+              reportState = error.code === 'ENOENT' ? 'missing' : 'invalid';
+            }
+            const jobs = {offline:process.env.OFFLINE_RESULT || 'unknown',browser:process.env.BROWSER_RESULT || 'unknown'};
+            const reportFailed = counts && (counts.failed > 0 || counts.flaky > 0 || (report.errors || []).length > 0);
+            const passed = jobs.offline === 'success' && jobs.browser === 'success' && counts && counts.passed > 0 && !reportFailed;
+            const outcome = passed ? 'passed' : Object.values(jobs).includes('failure') || reportFailed ? 'failed' : Object.values(jobs).includes('cancelled') ? 'cancelled' : 'unverified';
+            const summary = {schemaVersion:1,workflow:'Target editor and alert regression tests',sourceBranch:branch,testedCommit:context.sha,runId:String(context.runId),runNumber:process.env.GITHUB_RUN_NUMBER,runAttempt:process.env.GITHUB_RUN_ATTEMPT,runUrl:`${process.env.GITHUB_SERVER_URL}/${owner}/${repo}/actions/runs/${context.runId}`,generatedAt:new Date().toISOString(),jobs,outcome,reportState,browserCounts:counts,offlineCounts:null,reportErrorCount:report ? (report.errors || []).length : null,failures};
+            const content = JSON.stringify(summary,null,2) + '\n';
+            const prefix = 'targets/inline-targets-alert-consistency';
+            let head = null, baseTree;
+            try {
+              head = (await github.rest.git.getRef({owner,repo,ref:'heads/ci-results'})).data.object.sha;
+              baseTree = (await github.rest.git.getCommit({owner,repo,commit_sha:head})).data.tree.sha;
+            } catch (error) { if (error.status !== 404) throw error; }
+            let replaceLatest = true;
+            if (head) {
+              try {
+                const file = (await github.rest.repos.getContent({owner,repo,path:prefix + '/latest.json',ref:head})).data;
+                const old = JSON.parse(Buffer.from(file.content,'base64').toString('utf8'));
+                replaceLatest = Number(summary.runNumber) > Number(old.runNumber) || (Number(summary.runNumber) === Number(old.runNumber) && Number(summary.runAttempt) >= Number(old.runAttempt));
+              } catch (error) { if (error.status !== 404) throw error; }
+            }
+            const entries = [{path:`${prefix}/runs/${context.runId}-${summary.runAttempt}.json`,mode:'100644',type:'blob',content}];
+            if (replaceLatest) entries.push({path:prefix + '/latest.json',mode:'100644',type:'blob',content});
+            const tree = (await github.rest.git.createTree({owner,repo,...(baseTree ? {base_tree:baseTree} : {}),tree:entries})).data;
+            const commit = (await github.rest.git.createCommit({owner,repo,message:`Target editor CI ${context.runId}/${summary.runAttempt}: ${outcome}`,tree:tree.sha,parents:head ? [head] : []})).data;
+            if (head) await github.rest.git.updateRef({owner,repo,ref:'heads/ci-results',sha:commit.sha,force:false});
+            else await github.rest.git.createRef({owner,repo,ref:'refs/heads/ci-results',sha:commit.sha});
+            await core.summary.addHeading('Target editor regression result: ' + outcome).addRaw(`Tested commit: ${context.sha}; offline: ${jobs.offline}; browser: ${jobs.browser}; report: ${reportState}. Saved ${prefix}/latest.json on ci-results when this run is newest.\n`).write();
