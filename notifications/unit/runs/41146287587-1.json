@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "kind": "notification_unit_tests",
+  "workflow": "Notification unit tests",
+  "sourceBranch": "main",
+  "testedCommit": "c4d38fb689ffa6839cdb97c5001ea4cc628f49c2",
+  "runId": "41146287587",
+  "runNumber": "7",
+  "runAttempt": "1",
+  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/41146287587",
+  "generatedAt": "2026-10-30T23:45:14.488Z",
+  "jobResult": "success",
+  "outcome": "passed",
+  "reportState": "available",
+  "counts": {
+    "total": 11,
+    "passed": 11,
+    "failed": 0,
+    "skipped": 0,
+    "expectedFailures": 0
+  },
+  "monitorSyntax": "passed",
+  "failures": [],
+  "liveMessagesSent": false
+}
