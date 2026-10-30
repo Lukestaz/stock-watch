@@ -2,35 +2,43 @@
   "stocks": {
     "LUNR": {
       "armed": {
-        "near": true,
+        "near": false,
         "target": true
       },
-      "history_day": "2026-10-29",
-      "last": "2026-10-29T22:55:00Z"
+      "history_day": "2026-10-30",
+      "last": "2026-10-30T18:17:00Z",
+      "target_revision": 1,
+      "target_value": "1E+1"
     },
     "FLY": {
       "armed": {
         "near": true,
         "target": true
       },
-      "history_day": "2026-10-29",
-      "last": "2026-10-29T22:57:00Z"
+      "history_day": "2026-10-30",
+      "last": "2026-10-30T18:17:00Z",
+      "target_revision": 1,
+      "target_value": "15"
     },
     "RKLB": {
       "armed": {
         "near": true,
         "target": true
       },
-      "history_day": "2026-10-29",
-      "last": "2026-10-29T22:58:00Z"
+      "history_day": "2026-10-30",
+      "last": "2026-10-30T18:17:00Z",
+      "target_revision": 1,
+      "target_value": "4E+1"
     },
     "SPCX": {
       "armed": {
         "near": true,
         "target": true
       },
-      "history_day": "2026-10-29",
-      "last": "2026-10-29T22:58:00Z"
+      "history_day": "2026-10-30",
+      "last": "2026-10-30T18:17:00Z",
+      "target_revision": 1,
+      "target_value": "1E+2"
     }
   },
   "events": {
@@ -66,6 +74,20 @@
       "target": 10,
       "low": 10.5,
       "time": "2026-10-26T22:31:00Z",
+      "email": "accepted",
+      "whatsapp": "skipped",
+      "attempts": {
+        "email": 1,
+        "whatsapp": 0
+      }
+    },
+    "LUNR-r1-near-2026-10-30T17:34:00Z": {
+      "symbol": "LUNR",
+      "kind": "near",
+      "target": 10,
+      "target_revision": 1,
+      "low": 10.5,
+      "time": "2026-10-30T17:34:00Z",
       "email": "accepted",
       "whatsapp": "skipped",
       "attempts": {
