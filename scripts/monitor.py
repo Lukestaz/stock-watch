@@ -1,5 +1,5 @@
 import os,json,urllib.request,urllib.parse,math
-from notifications import send_email,send_whatsapp
+from notifications import send_formatted_alert
 from alert_rules import reconcile_target,match_kind,rearm,event_is_current
 from datetime import datetime,timedelta,timezone
 from pathlib import Path
@@ -85,14 +85,12 @@ for eid,e in state['events'].items():
             if e.get(channel)=='pending':e[channel]='superseded'
         save()
         continue
-    text=f"{e['symbol']} {e['kind']} review level: target ${e['target']}; observed low ${e['low']}; market timestamp {e['time']}. Consolidated data delayed at least 15 minutes. Check current price in Tiger. Not an automatic buy instruction."
     for channel,ready in [('email',email_ready),('whatsapp',wa_ready)]:
         if e[channel]!='pending' or not ready or e['attempts'][channel]>=3:continue
-        if now-datetime.fromisoformat(e['time'].replace('Z','+00:00'))>timedelta(hours=2):e[channel]='expired';continue
+        if now-datetime.fromisoformat(e['time'].replace('Z','+00:00'))>timedelta(hours=2):e[channel]='expired';save();continue
         e['attempts'][channel]+=1;save()
         try:
-            if channel=='email':send_email(text)
-            else:send_whatsapp(text)
+            send_formatted_alert(e,channel)
             e[channel]='accepted';public[channel]='last send accepted; delivery not independently verified'
         except Exception as exc:
             errors=True;print(channel,'send failed:',type(exc).__name__)

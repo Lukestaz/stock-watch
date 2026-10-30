@@ -2,7 +2,7 @@ name: Alert rule and monitor regressions
 on:
   workflow_dispatch:
   push:
-    branches: [main, 'feature/inline-targets-alert-consistency']
+    branches: [main, 'feature/inline-targets-alert-consistency', 'feature/account-email-alerts']
     paths: ['scripts/**', '.github/workflows/alert-regressions.yml']
   pull_request:
     branches: [main]
@@ -23,7 +23,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Run rules and mocked monitor with socket connections blocked
+      - name: Run rules, formatting, transports and monitor with socket connections blocked
         run: |
           python - <<'PY'
           import sys, unittest
@@ -31,7 +31,7 @@ jobs:
           sys.path.insert(0, 'scripts')
           loader = unittest.TestLoader()
           suite = unittest.TestSuite()
-          for pattern in ('test_alert_rules.py', 'test_monitor_integration.py'):
+          for pattern in ('test_alert_rules.py', 'test_alert_formatting.py', 'test_notifications*.py', 'test_monitor_integration.py'):
               discovered = loader.discover('scripts', pattern=pattern)
               if discovered.countTestCases() == 0:
                   raise RuntimeError('Required regression suite is empty: ' + pattern)
