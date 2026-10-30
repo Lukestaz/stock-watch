@@ -49,7 +49,7 @@ export function createAlertDestinationRoutes({enabled=false,allowedOrigin,authen
    const token=hex(crypto.getRandomValues(new Uint8Array(32))),expiresAt=now+600;
    const ok=await store.beginEmailVerification({userId:principal.userId,address,challengeHash:await hash(token),now,expiresAt});
    if(ok!==true)throw Error();
-   if(await sendVerification({to:address,token,expiresAt})!==true)throw Error();
+   if(await sendVerification({userId:principal.userId,to:address,token,expiresAt})!==true)throw Error();
    return reply({ok:true},202);
   }catch{return reply({error:'Destination service unavailable'},503);}
  };
