@@ -34,6 +34,8 @@ export function createAlertDestinationRoutes({enabled=false,allowedOrigin,authen
   let principal;
   try{principal=await authenticate(request);}catch{return reply({error:'Authentication unavailable'},503);}
   if(!principal||typeof principal.userId!=='string'||!principal.userId||principal.userId.length>256)return reply({error:'Sign in required'},401);
+  const expectedAccount=request.headers.get('X-Watchlist-Account');
+  if(expectedAccount!==null&&expectedAccount!==principal.userId)return reply({error:'Account changed; check your session'},409);
   try{if(await limit(request,principal.userId,url.pathname)!==true)return reply({error:'Too many requests'},429);}catch{return reply({error:'Destination service unavailable'},503);}
   let body;try{body=await bodyOf(request);}catch{return reply({error:'Invalid destination request'},400);}
   const verifying=url.pathname.endsWith('/verify');
