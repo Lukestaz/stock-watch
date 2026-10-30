@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "workflow": "Target editor and alert regression tests",
+  "sourceBranch": "feature/inline-targets-alert-consistency",
+  "testedCommit": "3b1c32128b2c8c795e0b41be0b952a955983debf",
+  "runId": "40994016540",
+  "runNumber": "3",
+  "runAttempt": "2",
+  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/40994016540",
+  "generatedAt": "2026-10-30T03:49:11.664Z",
+  "jobs": {
+    "offline": "success",
+    "browser": "failure"
+  },
+  "outcome": "failed",
+  "reportState": "available",
+  "browserCounts": {
+    "passed": 45,
+    "failed": 1,
+    "flaky": 0,
+    "skipped": 2
+  },
+  "offlineCounts": null,
+  "reportErrorCount": 0,
+  "failures": [
+    {
+      "browser": "chromium-desktop",
+      "title": "sign-out cancellation keeps inline draft; confirmed sign-out clears private cards",
+      "status": "unexpected"
+    }
+  ]
+}
