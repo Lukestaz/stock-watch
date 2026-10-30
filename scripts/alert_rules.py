@@ -24,17 +24,22 @@ def match_kind(low, target):
 
 
 def reconcile_target(state, target):
-    """Return copied state; preserve cursor and invalidate prior target revisions.
+    """Version targets without rearming existing flags during legacy adoption.
 
-    First adoption also increments revision: unversioned pending events must not
-    silently become eligible. Call only with a validated configured target.
+    Legacy state has no recorded target, so adoption cannot infer a target
+    change. Preserve its valid flags; missing flags on existing state fail
+    closed. New symbols and subsequent known target changes start armed.
+    Unversioned pending events remain ineligible for delivery.
     """
     target = price(target)
     result = {**state, 'armed': dict(state.get('armed', {}))}
     if state.get('target_value') != str(target.normalize()):
+        adopting = bool(state) and 'target_value' not in state
         result['target_revision'] = int(state.get('target_revision', 0)) + 1
         result['target_value'] = str(target.normalize())
-        result['armed'] = {'near': True, 'target': True}
+        result['armed'] = ({kind: state.get('armed', {}).get(kind) is True
+                            for kind in ('near', 'target')}
+                           if adopting else {'near': True, 'target': True})
     return result
 
 

@@ -1,0 +1,42 @@
+name: Alert rule and monitor regressions
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'feature/inline-targets-alert-consistency']
+    paths: ['scripts/**', '.github/workflows/alert-regressions.yml']
+  pull_request:
+    branches: [main]
+    paths: ['scripts/**', '.github/workflows/alert-regressions.yml']
+permissions:
+  contents: read
+concurrency:
+  group: alert-regressions-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+jobs:
+  alert-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run rules and mocked monitor with socket connections blocked
+        run: |
+          python - <<'PY'
+          import sys, unittest
+          from unittest.mock import patch
+          sys.path.insert(0, 'scripts')
+          loader = unittest.TestLoader()
+          suite = unittest.TestSuite()
+          for pattern in ('test_alert_rules.py', 'test_monitor_integration.py'):
+              discovered = loader.discover('scripts', pattern=pattern)
+              if discovered.countTestCases() == 0:
+                  raise RuntimeError('Required regression suite is empty: ' + pattern)
+              suite.addTests(discovered)
+          with patch('socket.socket.connect', side_effect=RuntimeError('Network disabled')), patch('socket.create_connection', side_effect=RuntimeError('Network disabled')):
+              result = unittest.TextTestRunner(verbosity=2).run(suite)
+          sys.exit(0 if result.wasSuccessful() else 1)
+          PY

@@ -22,12 +22,14 @@ class AlertRulesTests(unittest.TestCase):
         first = reconcile_target(original, 10)
         self.assertEqual(first['last'], 'cursor')
         self.assertEqual(first['target_revision'], 1)
-        self.assertTrue(first['armed']['target'])
+        self.assertFalse(first['armed']['target'])
         self.assertFalse(original['armed']['target'])
         same = reconcile_target(first, '10.00')
         self.assertEqual(same['target_revision'], 1)
         for target in [9, 11]:
-            self.assertEqual(reconcile_target(first, target)['target_revision'], 2)
+            changed = reconcile_target(first, target)
+            self.assertEqual(changed['target_revision'], 2)
+            self.assertEqual(changed['armed'], {'near': True, 'target': True})
 
     def test_rearm_strict_boundaries(self):
         off = {'near': False, 'target': False}
@@ -57,6 +59,27 @@ class AlertRulesTests(unittest.TestCase):
             {'symbol': 'ABC', 'target': 'NaN', 'target_revision': 1},
         ]:
             self.assertFalse(event_is_current(event, {'ABC': 10}, states))
+
+    def test_adoption_preserves_all_existing_flag_combinations(self):
+        for near in (False, True):
+            for target in (False, True):
+                original = {'last': 'cursor', 'armed': {'near': near, 'target': target}}
+                adopted = reconcile_target(original, 10)
+                self.assertEqual(adopted['armed'], original['armed'])
+                self.assertIsNot(adopted['armed'], original['armed'])
+                self.assertEqual(adopted['last'], 'cursor')
+
+    def test_adoption_below_target_does_not_retrigger(self):
+        state = reconcile_target({'armed': {'near': False, 'target': False}}, 10)
+        armed = rearm(state['armed'], '9.95', 10)
+        kind = match_kind('9.90', 10)
+        self.assertEqual(kind, 'target')
+        self.assertFalse(armed[kind])
+        self.assertFalse(event_is_current({'symbol': 'ABC', 'target': 10}, {'ABC': 10}, {'ABC': state}))
+
+    def test_new_symbol_arms_but_unknown_legacy_flags_do_not(self):
+        self.assertEqual(reconcile_target({}, 10)['armed'], {'near': True, 'target': True})
+        self.assertEqual(reconcile_target({'last': 'cursor'}, 10)['armed'], {'near': False, 'target': False})
 
 
 if __name__ == '__main__':
