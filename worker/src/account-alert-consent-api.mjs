@@ -1,6 +1,6 @@
 // Candidate consent API only. Requires explicit runtime and enrolment gates.
 const root='/v1/alert-consent/email';
-const reply=(body,status)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store','Vary':'Origin','X-Content-Type-Options':'nosniff'}});
+const reply=(body,status,account)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store','Vary':'Origin','X-Content-Type-Options':'nosniff',...(account?{'X-Watchlist-Account':account}:{})}});
 async function bodyOf(request){
  const reader=request.body?.getReader();if(!reader)throw Error();let size=0;const chunks=[];
  try{for(;;){const r=await reader.read();if(r.done)break;size+=r.value.byteLength;if(size>2048){await reader.cancel();throw Error();}chunks.push(r.value);}}finally{reader.releaseLock();}
@@ -15,16 +15,17 @@ export function createAccountAlertConsentApi({enabled=false,enrollmentEnabled=fa
   try{
    if(await admit(request)!==true)return reply({error:'Too many requests'},429);
    const principal=await authenticate(request);if(!principal||typeof principal.userId!=='string'||!principal.userId||principal.userId.length>256)return reply({error:'Sign in required'},401);
+   const expected=request.headers.get('X-Watchlist-Account');if(expected!==null&&expected!==principal.userId)return reply({error:'Account changed; reload before saving'},409);
    if(await limit(request,principal.userId,url.pathname)!==true)return reply({error:'Too many requests'},429);
-   if(request.method==='GET'){const value=await store.read(principal.userId);return value?reply(value,200):reply({error:'Account unavailable'},404);}
-   if(request.headers.get('X-Watchlist-Account')!==principal.userId)return reply({error:'Account changed; reload before saving'},409);
+   if(request.method==='GET'){const value=await store.read(principal.userId);return value?reply(value,200,principal.userId):reply({error:'Account unavailable'},404);}
+   if(expected!==principal.userId)return reply({error:'Account changed; reload before saving'},409);
    if(request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase()!=='application/json')return reply({error:'JSON required'},415);
    let body;try{body=await bodyOf(request);}catch{return reply({error:'Invalid consent request'},400);}
    const keys=['symbol','enabled','expectedWatchlistRevision','expectedTargetRevision','expectedDestinationRevision'];
    const rev=v=>Number.isSafeInteger(v)&&v>=0&&v<Number.MAX_SAFE_INTEGER;
    if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).length!==keys.length||!keys.every(k=>Object.hasOwn(body,k))||typeof body.symbol!=='string'||!/^[A-Z0-9][A-Z0-9.\-]{0,14}$/.test(body.symbol)||typeof body.enabled!=='boolean'||!rev(body.expectedWatchlistRevision)||!rev(body.expectedTargetRevision)||(body.expectedDestinationRevision!==null&&!rev(body.expectedDestinationRevision))||(body.enabled&&!(body.expectedDestinationRevision>0)))return reply({error:'Invalid consent request'},400);
    if(body.enabled&&enrollmentEnabled!==true)return reply({error:'Alert enrollment unavailable'},409);
-   const result=await store.setEmailConsent({...body,userId:principal.userId,now:clock()});return result?reply(result,200):reply({error:'Watchlist or verified destination changed; reload before saving'},409);
+   const result=await store.setEmailConsent({...body,userId:principal.userId,now:clock()});return result?reply(result,200,principal.userId):reply({error:'Watchlist or verified destination changed; reload before saving'},409);
   }catch{return reply({error:'Alert consent unavailable'},503);}
  };
 }
