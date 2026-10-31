@@ -1,0 +1,32 @@
+name: Friends staging build tests
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'feature/multi-user-alerts']
+    paths: ['scripts/build-friends-staging.py', 'tests/test_friends_staging_build.py', 'site/**', 'worker/src/**', 'worker/migrations/**', '.github/workflows/friends-staging-build-tests.yml']
+  pull_request:
+    branches: [main]
+    paths: ['scripts/build-friends-staging.py', 'tests/test_friends_staging_build.py', 'site/**', 'worker/src/**', 'worker/migrations/**', '.github/workflows/friends-staging-build-tests.yml']
+permissions:
+  contents: read
+jobs:
+  staging-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test build isolation and rejection cases without network or credentials
+        run: python3 -m unittest discover -s tests -p test_friends_staging_build.py -v
+      - name: Build actual checkout with fixture identifiers and syntax-check bootstrap
+        run: |
+          python3 scripts/build-friends-staging.py --origin https://staging.example.invalid --worker fixture-staging --database-name fixture-staging-db --database-id 11111111-1111-4111-8111-111111111111 --client-id 123-fixture.apps.googleusercontent.com --prices-service fixture-prices --rate-limit-namespace 123456789 --output "$RUNNER_TEMP/friends-staging-build"
+          node --check "$RUNNER_TEMP/friends-staging-build/static/account-signin.js"
+          node --check "$RUNNER_TEMP/friends-staging-build/src/account-runtime.mjs"
