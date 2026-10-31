@@ -1,0 +1,27 @@
+name: Assembled verification and preview tests
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'feature/multi-user-alerts']
+    paths: ['site/account-alert-settings.mjs', 'worker/src/account-*.mjs', 'worker/test/account-*.test.mjs', 'worker/migrations/**', 'tests/schema/sqlite_d1_bridge.py', '.github/workflows/assembled-verification-preview-tests.yml']
+  pull_request:
+    branches: [main]
+    paths: ['site/account-alert-settings.mjs', 'worker/src/account-*.mjs', 'worker/test/account-*.test.mjs', 'worker/migrations/**', 'tests/schema/sqlite_d1_bridge.py', '.github/workflows/assembled-verification-preview-tests.yml']
+permissions:
+  contents: read
+jobs:
+  preview-and-service:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run preview, account guard, assembled SMTP service and prior verification suites
+        run: node --test worker/test/account-alert-settings.test.mjs worker/test/account-alert-account-guard.test.mjs worker/test/account-gmail-assembled.test.mjs worker/test/account-verification-service.test.mjs worker/test/account-budgeted-verification.test.mjs worker/test/account-verification-mail.test.mjs worker/test/account-alert-destination*.test.mjs

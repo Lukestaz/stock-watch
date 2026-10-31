@@ -1,0 +1,27 @@
+name: Durable alert destination store tests
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'feature/multi-user-alerts']
+    paths: ['worker/migrations/**', 'worker/src/account-alert-destination-store.mjs', 'worker/test/account-alert-destination-store.test.mjs', 'tests/schema/sqlite_d1_bridge.py', '.github/workflows/alert-destination-store-tests.yml']
+  pull_request:
+    branches: [main]
+    paths: ['worker/migrations/**', 'worker/src/account-alert-destination-store.mjs', 'worker/test/account-alert-destination-store.test.mjs', 'tests/schema/sqlite_d1_bridge.py', '.github/workflows/alert-destination-store-tests.yml']
+permissions:
+  contents: read
+jobs:
+  store:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test real SQL against temporary local SQLite databases
+        run: node --test worker/test/account-alert-destination-store.test.mjs

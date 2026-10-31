@@ -1,0 +1,24 @@
+name: Candidate alert destination API tests
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'feature/multi-user-alerts']
+    paths: ['worker/src/account-alert-destinations.mjs', 'worker/test/account-alert-destinations.test.mjs', '.github/workflows/alert-destination-api-tests.yml']
+  pull_request:
+    branches: [main]
+    paths: ['worker/src/account-alert-destinations.mjs', 'worker/test/account-alert-destinations.test.mjs', '.github/workflows/alert-destination-api-tests.yml']
+permissions:
+  contents: read
+jobs:
+  routes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test candidate routes with in-memory store and mocked mail
+        run: node --test worker/test/account-alert-destinations.test.mjs
