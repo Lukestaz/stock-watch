@@ -40,7 +40,7 @@ export function createFriendsSchedule({enabled=false,db,source,producer,dispatch
      AND d.provider='shared-smtp' AND d.provider_binding_ref IS NULL GROUP BY e.symbol ORDER BY e.symbol LIMIT ?`;
    const r=await db.batch([db.prepare(sql).bind(maxSymbols+1)]);
    if(!Array.isArray(r)||r[0]?.success!==true||!Array.isArray(r[0].results))throw Error();
-   if(r[0].results.length>maxSymbols)return {...result,status:'capacity'};
+   if(r[0].results.length>maxSymbols){result.status='capacity';return result;}
    for(const row of r[0].results){
     result.symbols++;
     try{
@@ -51,9 +51,12 @@ export function createFriendsSchedule({enabled=false,db,source,producer,dispatch
     }catch{result.errors++;}
    }
    const sent=await dispatcher.run({limit:10});result.accepted=sent.accepted;result.deferred=sent.deferred||0;result.failed=sent.failed||0;result.uncertain=sent.uncertain||0;if(result.failed||result.uncertain)result.errors++;
-   try{await cleanup();}catch{result.errors++;}
    result.status=result.errors?'partial':'ok';return result;
-  }catch{return {...result,status:'unavailable',errors:result.errors+1};}
+  }catch{result.status='unavailable';result.errors++;return result;}
+  finally{
+   try{if(await cleanup()===false)throw Error('Retention unavailable');}
+   catch{result.errors++;if(result.status==='ok')result.status='partial';}
+  }
  }};
 }
 const off=()=>({ready:false,enrollmentEnabled:false,scheduledConfigured:false,fetch:async()=>Response.json({error:'Friends alerts unavailable'},{status:503,headers:{'Cache-Control':'no-store'}}),scheduled:async()=>({status:'disabled'})});
