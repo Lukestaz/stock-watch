@@ -1,0 +1,82 @@
+name: Inspect production D1 schema
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: inspect-production-d1-schema
+  cancel-in-progress: false
+jobs:
+  inspect-schema:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Inspect metadata only; no migrations, deployment or application rows
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: c4814713eafd41ae857b9a8097610df6
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          python3 - <<'PY'
+          import json,os,subprocess,sys
+          from pathlib import Path
+          root=Path(os.environ['RUNNER_TEMP'])/'stock-watch-schema-inspection'
+          root.mkdir()
+          config=root/'wrangler.jsonc'
+          database_id='4cb54afc-8f2d-4f62-8b6b-7d59f343b938'
+          config.write_text(json.dumps({'name':'stock-watch-app','compatibility_date':'2026-10-19','d1_databases':[{'binding':'DB','database_name':'stock-watch','database_id':database_id}]}))
+          if not os.environ.get('CLOUDFLARE_API_TOKEN'):
+              sys.exit('Inspection unavailable: missing configured API token')
+          def query(sql):
+              command=['npx','--yes','wrangler@4.150.0','d1','execute','DB','--remote','--config',str(config),'--command',sql,'--json']
+              result=subprocess.run(command,capture_output=True,text=True,timeout=180)
+              if result.returncode:
+                  raise RuntimeError('Metadata query failed; raw provider output suppressed')
+              reports=json.loads(result.stdout)
+              if not isinstance(reports,list) or not reports or any(x.get('success') is not True or not isinstance(x.get('results'),list) for x in reports):
+                  raise RuntimeError('Unexpected metadata query result')
+              return reports
+          try:
+              objects=query("SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name;")[0]['results']
+              tables=['users','watchlists','watchlist_entries','login_challenges','sessions','price_cache_entries','price_cache_budget','alert_destinations','alert_email_challenges','account_alert_monitors','account_alert_events','account_alert_deliveries','verification_request_attempts','verification_mail_reservations','d1_migrations']
+              statements=[]
+              labels=[]
+              for table in tables:
+                  for kind in ['table_info','foreign_key_list','index_list']:
+                      statements.append('PRAGMA '+kind+'("'+table+'");')
+                      labels.append((table,kind))
+              metadata=query(' '.join(statements))
+              if len(metadata)!=len(labels):
+                  raise RuntimeError('Unexpected metadata statement count')
+              schema={table:{} for table in tables}
+              for (table,kind),report in zip(labels,metadata):
+                  schema[table][kind]=report['results']
+              ledger_columns={x['name'] for x in schema['d1_migrations']['table_info']}
+              migration_names=None
+              if 'name' in ledger_columns:
+                  migration_names=query('SELECT name FROM d1_migrations ORDER BY name LIMIT 1000;')[0]['results']
+              document={'repository':os.environ['GITHUB_REPOSITORY'],'workflow_revision':os.environ['GITHUB_SHA'],'database_name':'stock-watch','database_id':database_id,'scope':'schema definitions, column/index/foreign-key metadata and migration names only','objects':objects,'tables':schema,'migration_names':migration_names}
+              (root/'production-schema-metadata.json').write_text(json.dumps(document,indent=2)+'\n')
+              present=[table for table in tables if schema[table]['table_info']]
+              with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as summary:
+                  summary.write('Production D1 metadata inspection completed. No application rows read, migrations applied or deployment performed.\n\n')
+                  summary.write('Database: stock-watch ('+database_id+').\n\n')
+                  summary.write('Present inspected tables: '+', '.join(present)+'.\n\n')
+                  summary.write('Migration ledger: '+('name column available' if migration_names is not None else 'not available in expected format')+'.\n')
+          except Exception:
+              sys.exit('Production schema inspection failed; no migrations or deployment were attempted. Raw provider errors suppressed.')
+          PY
+      - name: Retain metadata report for one day
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-schema-metadata
+          path: ${{ runner.temp }}/stock-watch-schema-inspection/production-schema-metadata.json
+          retention-days: 1
+          if-no-files-found: error
