@@ -1,0 +1,174 @@
+name: Migrate production friends schema
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type APPLY stock-watch 0005-0010 to authorise production schema writes'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: production-friends-schema-migration
+  cancel-in-progress: false
+jobs:
+  migrate-schema:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Require exact migration confirmation
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: test "$CONFIRMATION" = 'APPLY stock-watch 0005-0010'
+      - uses: actions/checkout@v4
+        with:
+          ref: e977e9e0dcb44708fa9cdf1199ce69a8ea6e02a6
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run pinned account regression suites offline
+        run: node --test worker/test/account-*.test.mjs
+      - name: Verify pinned migrations and construct exact database configuration
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,os,shutil
+          from pathlib import Path
+          expected={
+            '0001_accounts.sql':'898e7aa528bd273e2ba55c4da88cd0d511c06eee',
+            '0002_write_token.sql':'cfb76dbde64af4a723b4a209a65f9edf78f82a5b',
+            '0003_identity.sql':'eebdd5867a12c57445fc06d64e22fa30c83a68e3',
+            '0004_price_cache.sql':'c38a82109c1ff0376863effb642568d663dc32da',
+            '0005_account_alerts.sql':'16bc4029f8d97013279d4b592110e94f2fcb43d9',
+            '0006_alert_email_challenges.sql':'af3df440590de63439cff256d30b00960e7136c1',
+            '0007_verification_mail_budget.sql':'71f24a7f15b53b287f6624f29dd77d9fe55bd08f',
+            '0008_verification_requests.sql':'fd4c73e28d66c558f22d326b22445b24255fd910',
+            '0009_account_alert_monitors.sql':'a7070a33e6496f1fa51e5f1432b3d7214125e8ed',
+            '0010_account_email_dispatch.sql':'942a684f82b52bfe441372bc72c557884559c87c'}
+          source=Path('worker/migrations')
+          assert {p.name for p in source.glob('*.sql')}==set(expected),'Migration set changed'
+          root=Path(os.environ['RUNNER_TEMP'])/'friends-production-migration'
+          (root/'migrations').mkdir(parents=True)
+          for name,digest in expected.items():
+              data=(source/name).read_bytes()
+              actual=hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+              assert actual==digest,'Migration content changed: '+name
+              shutil.copyfile(source/name,root/'migrations'/name)
+          config={'name':'stock-watch-app','compatibility_date':'2026-10-19','d1_databases':[{'binding':'DB','database_name':'stock-watch','database_id':'4cb54afc-8f2d-4f62-8b6b-7d59f343b938','migrations_dir':'./migrations'}]}
+          (root/'wrangler.jsonc').write_text(json.dumps(config))
+          (root/'migration-manifest.json').write_text(json.dumps({'source_revision':'e977e9e0dcb44708fa9cdf1199ce69a8ea6e02a6','database_id':config['d1_databases'][0]['database_id'],'git_blob_hashes':expected},indent=2))
+          PY
+      - name: Live baseline checks and recovery bookmark; no schema writes yet
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: c4814713eafd41ae857b9a8097610df6
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          python3 - <<'PY'
+          import json,os,subprocess,sys,time
+          from pathlib import Path
+          root=Path(os.environ['RUNNER_TEMP'])/'friends-production-migration'
+          def command(args):
+              p=subprocess.run(['npx','--yes','wrangler@4.150.0',*args,'--config',str(root/'wrangler.jsonc')],capture_output=True,text=True,timeout=180)
+              if p.returncode: raise RuntimeError('Cloudflare preflight failed')
+              return json.loads(p.stdout)
+          def query(sql):
+              reports=command(['d1','execute','DB','--remote','--command',sql,'--json'])
+              if not isinstance(reports,list) or not reports or any(x.get('success') is not True for x in reports): raise RuntimeError('Unexpected database response')
+              return reports
+          try:
+              if not os.environ.get('CLOUDFLARE_API_TOKEN'): raise RuntimeError('Missing token')
+              baseline=['0001_accounts.sql','0002_write_token.sql','0003_identity.sql','0004_price_cache.sql']
+              ledger=query('SELECT name FROM d1_migrations ORDER BY name;')[0]['results']
+              assert [x['name'] for x in ledger]==baseline,'Live migration baseline changed; stop and inspect'
+              objects=query("SELECT type,name FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%';")[0]['results']
+              tables={x['name'] for x in objects if x['type']=='table'}
+              old={'users','watchlists','watchlist_entries','login_challenges','sessions','price_cache_entries','price_cache_budget'}
+              new={'alert_destinations','alert_email_challenges','account_alert_monitors','account_alert_events','account_alert_deliveries','verification_request_attempts','verification_mail_reservations'}
+              assert old<=tables and not new.intersection(tables),'Unexpected live tables'
+              required_objects={'watchlist_entries_order','watchlist_entries_limit_insert','watchlist_entries_limit_move','login_challenges_expiry','sessions_user','sessions_expiry'}
+              assert required_objects<={x['name'] for x in objects},'Baseline indexes/triggers missing'
+              columns=query('PRAGMA table_info(watchlists); PRAGMA table_info(watchlist_entries);')
+              assert 'write_token' in {x['name'] for x in columns[0]['results']}
+              assert {'target_revision','alerts_enabled','email_enabled','whatsapp_enabled'}<={x['name'] for x in columns[1]['results']}
+              recovery=command(['d1','time-travel','info','DB','--json'])
+              def bookmarks(value):
+                  if isinstance(value,dict):
+                      for key,item in value.items():
+                          if key=='bookmark' and isinstance(item,str) and len(item)>10: yield item
+                          else: yield from bookmarks(item)
+                  elif isinstance(value,list):
+                      for item in value: yield from bookmarks(item)
+              assert list(bookmarks(recovery)),'No recovery bookmark; stop without migrating'
+              (root/'recovery-bookmark.json').write_text(json.dumps(recovery,indent=2))
+              (root/'preflight.json').write_text(json.dumps({'checked_at':int(time.time()),'baseline':baseline,'new_tables_absent':True}))
+          except Exception:
+              sys.exit('Preflight failed. No migration command was run; inspect configuration, schema or recovery support before retrying.')
+          PY
+      - name: Preserve recovery evidence before any migration
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-friends-migration-recovery-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/friends-production-migration/recovery-bookmark.json
+            ${{ runner.temp }}/friends-production-migration/preflight.json
+            ${{ runner.temp }}/friends-production-migration/migration-manifest.json
+          retention-days: 7
+          if-no-files-found: error
+      - name: Apply only the pinned pending migrations; no deployment or activation
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: c4814713eafd41ae857b9a8097610df6
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          python3 - <<'PY'
+          import json,os,subprocess,sys,time
+          from pathlib import Path
+          root=Path(os.environ['RUNNER_TEMP'])/'friends-production-migration'
+          preflight=json.loads((root/'preflight.json').read_text())
+          assert 0<=time.time()-preflight['checked_at']<300,'Preflight is stale; no migration attempted'
+          command=['npx','--yes','wrangler@4.150.0','d1','migrations','apply','DB','--remote','--config',str(root/'wrangler.jsonc')]
+          result=subprocess.run(command,capture_output=True,text=True,timeout=300)
+          if result.returncode:
+              sys.exit('Migration failed. Earlier successful migrations may remain applied. No automatic rollback was performed. Run metadata inspection before any retry.')
+          PY
+      - name: Verify installed schema and migration ledger without application rows
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: c4814713eafd41ae857b9a8097610df6
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          python3 - <<'PY'
+          import json,os,subprocess,sys
+          from pathlib import Path
+          root=Path(os.environ['RUNNER_TEMP'])/'friends-production-migration'
+          sql="SELECT name FROM d1_migrations ORDER BY name; SELECT type,name FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'; PRAGMA table_info(account_alert_deliveries); PRAGMA table_info(verification_mail_reservations);"
+          p=subprocess.run(['npx','--yes','wrangler@4.150.0','d1','execute','DB','--remote','--config',str(root/'wrangler.jsonc'),'--command',sql,'--json'],capture_output=True,text=True,timeout=180)
+          try:
+              assert p.returncode==0
+              reports=json.loads(p.stdout)
+              assert len(reports)==4 and all(x.get('success') is True for x in reports)
+              expected=json.loads((root/'migration-manifest.json').read_text())['git_blob_hashes']
+              assert [x['name'] for x in reports[0]['results']]==sorted(expected)
+              objects={x['name'] for x in reports[1]['results']}
+              required={'alert_destinations','alert_email_challenges','account_alert_monitors','account_alert_events','account_alert_deliveries','verification_request_attempts','verification_mail_reservations','alert_destination_changed','alert_email_challenge_consumed','account_alert_delivery_queue','alert_email_challenges_expiry','verification_mail_global_time','verification_mail_user_time','verification_mail_destination_time','verification_request_global_time','verification_request_actor_time','account_email_claims','mail_purpose_user_time','mail_purpose_destination_time'}
+              assert required<=objects
+              assert {'consent_revision','claim_token','claim_until','dispatch_token','send_started_at','last_error_category'}<={x['name'] for x in reports[2]['results']}
+              assert 'purpose' in {x['name'] for x in reports[3]['results']}
+              (root/'postflight.json').write_text(json.dumps(reports,indent=2))
+              with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as summary:
+                  summary.write('Verified production stock-watch schema migrations 0001-0010. No app deployment, feature flags, cron, secrets or email sends changed. Recovery evidence is attached. This is schema installation only, not live-alert readiness.\n')
+          except Exception:
+              sys.exit('Post-migration verification failed. Schema may already be changed; inspect before proceeding. No automatic restore performed.')
+          PY
+      - name: Retain verified schema metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-friends-schema-postflight-${{ github.run_id }}
+          path: ${{ runner.temp }}/friends-production-migration/postflight.json
+          retention-days: 7
+          if-no-files-found: error
