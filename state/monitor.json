@@ -2,11 +2,11 @@
   "stocks": {
     "LUNR": {
       "armed": {
-        "near": true,
-        "target": true
+        "near": false,
+        "target": false
       },
-      "history_day": "2026-10-30",
-      "last": "2026-10-30T21:59:00Z",
+      "history_day": "2026-11-02",
+      "last": "2026-11-02T21:58:00Z",
       "target_revision": 1,
       "target_value": "1E+1"
     },
@@ -15,8 +15,8 @@
         "near": true,
         "target": true
       },
-      "history_day": "2026-10-30",
-      "last": "2026-10-30T22:20:00Z",
+      "history_day": "2026-11-02",
+      "last": "2026-11-02T21:55:00Z",
       "target_revision": 1,
       "target_value": "15"
     },
@@ -25,8 +25,8 @@
         "near": true,
         "target": true
       },
-      "history_day": "2026-10-30",
-      "last": "2026-10-30T22:22:00Z",
+      "history_day": "2026-11-02",
+      "last": "2026-11-02T22:01:00Z",
       "target_revision": 1,
       "target_value": "4E+1"
     },
@@ -35,8 +35,8 @@
         "near": true,
         "target": true
       },
-      "history_day": "2026-10-30",
-      "last": "2026-10-30T22:22:00Z",
+      "history_day": "2026-11-02",
+      "last": "2026-11-02T22:01:00Z",
       "target_revision": 1,
       "target_value": "1E+2"
     }
@@ -93,6 +93,20 @@
       "attempts": {
         "email": 1,
         "whatsapp": 0
+      }
+    },
+    "LUNR-r1-target-2026-11-02T21:19:00Z": {
+      "symbol": "LUNR",
+      "kind": "target",
+      "target": 10,
+      "target_revision": 1,
+      "low": 9.92,
+      "time": "2026-11-02T21:19:00Z",
+      "email": "accepted",
+      "whatsapp": "accepted",
+      "attempts": {
+        "email": 1,
+        "whatsapp": 1
       }
     }
   }
