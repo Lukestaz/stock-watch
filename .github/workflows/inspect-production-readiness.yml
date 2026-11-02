@@ -1,0 +1,99 @@
+name: Inspect production app readiness
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: inspect-stock-watch-app-readiness
+  cancel-in-progress: false
+jobs:
+  inspect:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Inspect provider-secret names only; never values
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: c4814713eafd41ae857b9a8097610df6
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          python3 - <<'PY'
+          import json,os,subprocess,sys
+          from pathlib import Path
+          root=Path(os.environ['RUNNER_TEMP'])/'stock-watch-readiness'
+          root.mkdir()
+          config=root/'wrangler.jsonc'
+          config.write_text(json.dumps({'name':'stock-watch-app','compatibility_date':'2026-10-19'}))
+          if not os.environ.get('CLOUDFLARE_API_TOKEN'):
+              sys.exit('Missing configured Cloudflare API token; no provider credentials were inspected')
+          p=subprocess.run(['npx','--yes','wrangler@4.150.0','secret','list','--name','stock-watch-app','--format','json','--config',str(config)],capture_output=True,text=True,timeout=180)
+          try:
+              assert p.returncode==0
+              entries=json.loads(p.stdout)
+              assert isinstance(entries,list) and all(isinstance(x,dict) for x in entries)
+              names={x.get('name') for x in entries if x.get('type')=='secret_text'}
+              required=['GMAIL_USER','GMAIL_APP_PASSWORD','ALPACA_KEY','ALPACA_SECRET']
+              report={'worker':'stock-watch-app','secret_name_presence':{name:name in names for name in required},'credential_validity_tested':False,'provider_requests_sent':False}
+              (root/'provider-secret-presence.json').write_text(json.dumps(report,indent=2)+'\n')
+              with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as summary:
+                  summary.write('Provider bindings: secret-name presence only, not credential validity.\n\n')
+                  for name in required:
+                      summary.write('- '+name+': '+('present' if name in names else 'missing')+'\n')
+          except Exception:
+              sys.exit('Secret-name inspection failed. Raw CLI/provider output suppressed; no secret changes or email sends attempted.')
+          PY
+      - name: Verify deployed build, origin guards and disabled alert routes without redeploying
+        run: |
+          node --input-type=module <<'JS'
+          import {readFileSync,writeFileSync,appendFileSync} from 'node:fs';
+          const origin='https://stock-watch-app.lukestaz.workers.dev';
+          const expected='e977e9e0dcb44708fa9cdf1199ce69a8ea6e02a6';
+          const root=process.env.RUNNER_TEMP+'/stock-watch-readiness';
+          const checks=[];
+          const check=(name,passed)=>checks.push({name,passed:passed===true});
+          const get=(path,headers={})=>fetch(origin+path,{method:'GET',headers,redirect:'error',signal:AbortSignal.timeout(20000)});
+          let health=null;
+          try{
+            const r=await get('/api/health'),h=await r.json();
+            health={build:h.build,ok:h.ok,mode:h.mode,databaseBound:h.database?.bound,databaseReady:h.database?.ready,verificationReady:h.friendsAlerts?.verificationReady===true,enrollmentAvailable:h.friendsAlerts?.enrollmentAvailable===true,scheduledConfigured:h.friendsAlerts?.scheduledConfigured===true};
+            check('expected-build-and-account-health',r.ok&&h.ok===true&&h.build===expected&&h.mode==='account-preview'&&h.database?.bound===true&&h.database?.ready===true);
+            check('friends-feature-readiness-off',!health.verificationReady&&!health.enrollmentAvailable&&!health.scheduledConfigured);
+          }catch{check('expected-build-and-account-health',false);}
+          for(const path of ['/','/account-signin.js','/account-alert-settings.mjs','/account-friends-email.mjs']){
+            try{check('asset '+path,(await get(path)).ok);}catch{check('asset '+path,false);}
+          }
+          for(const path of ['/api/v1/alert-destination/email','/api/v1/alert-destination/email/verify','/api/v1/alert-consent/email']){
+            try{check('disabled route '+path,(await get(path)).status===503);}catch{check('disabled route '+path,false);}
+          }
+          try{check('bare-watchlist-origin-rejected',(await get('/api/v1/watchlist')).status===403);}catch{check('bare-watchlist-origin-rejected',false);}
+          try{
+            const r=await get('/api/v1/watchlist',{'Origin':origin,'Sec-Fetch-Site':'same-origin'});
+            check('same-origin-anonymous-session-rejected',r.status===401);
+            check('anonymous-no-session-cookie',!r.headers.has('set-cookie'));
+          }catch{check('same-origin-anonymous-session-rejected',false);}
+          try{check('cross-origin-watchlist-rejected',(await get('/api/v1/watchlist',{'Origin':'https://example.invalid','Sec-Fetch-Site':'cross-site'})).status===403);}catch{check('cross-origin-watchlist-rejected',false);}
+          const provider=JSON.parse(readFileSync(root+'/provider-secret-presence.json','utf8'));
+          const names=provider.secret_name_presence;
+          const report={checkedAt:new Date().toISOString(),expectedRelease:expected,health,checks,secretNamePresence:names,verificationSecretNamesPresent:names.GMAIL_USER&&names.GMAIL_APP_PASSWORD,marketSecretNamesPresent:names.ALPACA_KEY&&names.ALPACA_SECRET,credentialValidityTested:false,cronRegistrationInspected:false,liveEmailReceiptVerified:false};
+          writeFileSync(root+'/readiness.json',JSON.stringify(report,null,2));
+          for(const c of checks)appendFileSync(process.env.GITHUB_STEP_SUMMARY,'- '+c.name+': '+(c.passed?'PASS':'FAIL')+'\n');
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY,'\nNo redeployment, migrations, secret changes, feature activation, cron changes or email requests. HTTP probes may increment admission/rate-limit counters. Missing provider-secret names are reported, not treated as successful provider readiness. Even present names do not prove credential validity, provider access or delivery.\n');
+          if(checks.some(c=>!c.passed))process.exitCode=1;
+          JS
+      - name: Retain redacted readiness metadata
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-app-readiness-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/stock-watch-readiness/provider-secret-presence.json
+            ${{ runner.temp }}/stock-watch-readiness/readiness.json
+          retention-days: 1
+          if-no-files-found: warn
