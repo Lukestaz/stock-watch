@@ -19,13 +19,14 @@ jobs:
     env:
       RELEASE_SHA: e977e9e0dcb44708fa9cdf1199ce69a8ea6e02a6
       APP_URL: https://stock-watch-app.lukestaz.workers.dev
-      APP_DIR: ${{ runner.temp }}/stock-watch-app-release
       WRANGLER_SEND_METRICS: 'false'
     steps:
       - name: Require exact manual deployment confirmation
         env:
           CONFIRMATION: ${{ inputs.confirmation }}
         run: test "$CONFIRMATION" = 'DEPLOY stock-watch-app e977e9e ALERTS-OFF'
+      - name: Initialize runner build path
+        run: echo "APP_DIR=$RUNNER_TEMP/stock-watch-app-release" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
         with:
           ref: e977e9e0dcb44708fa9cdf1199ce69a8ea6e02a6
