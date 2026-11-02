@@ -3,6 +3,7 @@ const user=value=>typeof value==='string'&&value.length>0&&value.length<=256;
 const revision=value=>Number.isSafeInteger(value)&&value>=0&&value<Number.MAX_SAFE_INTEGER;
 const timestamp=value=>Number.isSafeInteger(value)&&value>0;
 const symbol=value=>typeof value==='string'&&/^[A-Z0-9][A-Z0-9.\-]{0,14}$/.test(value);
+export const ACCOUNT_EMAIL_SYMBOL_LIMIT=20;
 export function createD1AccountAlertStore(db,{enrollmentEnabled=false,evaluationEnabled=false}={}){
  if(typeof db?.prepare!=='function'||typeof db?.batch!=='function')throw Error('Account alert storage required');
  const stmt=(sql,args)=>db.prepare(sql).bind(...args);
@@ -37,7 +38,9 @@ export function createD1AccountAlertStore(db,{enrollmentEnabled=false,evaluation
      AND EXISTS (SELECT 1 FROM watchlist_entries WHERE user_id=? AND symbol=? AND target_revision=?)
      AND (?=0 OR EXISTS (SELECT 1 FROM alert_destinations d WHERE d.user_id=? AND d.channel='email' AND d.revision=? AND d.verified_at IS NOT NULL
       AND (d.enabled=1 OR NOT EXISTS (SELECT 1 FROM watchlist_entries e WHERE e.user_id=d.user_id AND e.symbol<>? AND e.email_enabled=1))))
-     RETURNING revision`,[token,now,userId,expectedWatchlistRevision,userId,stock,expectedTargetRevision,value,userId,expectedDestinationRevision??0,stock]),
+     AND (?=0 OR EXISTS (SELECT 1 FROM watchlist_entries WHERE symbol=? AND email_enabled=1)
+      OR (SELECT count(DISTINCT symbol) FROM watchlist_entries WHERE email_enabled=1)<?)
+     RETURNING revision`,[token,now,userId,expectedWatchlistRevision,userId,stock,expectedTargetRevision,value,userId,expectedDestinationRevision??0,stock,value,stock,ACCOUNT_EMAIL_SYMBOL_LIMIT]),
     stmt(`UPDATE watchlist_entries SET email_enabled=?,alerts_enabled=CASE WHEN ?=1 OR whatsapp_enabled=1 THEN 1 ELSE 0 END,updated_at=?
      WHERE user_id=? AND symbol=? AND `+owner,[value,value,now,userId,stock,userId,token]),
     stmt(`UPDATE alert_destinations SET enabled=CASE WHEN ?=1 THEN 1 WHEN NOT EXISTS
