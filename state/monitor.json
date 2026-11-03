@@ -3,10 +3,10 @@
     "LUNR": {
       "armed": {
         "near": false,
-        "target": false
+        "target": true
       },
-      "history_day": "2026-11-02",
-      "last": "2026-11-02T21:58:00Z",
+      "history_day": "2026-11-03",
+      "last": "2026-11-03T19:48:00Z",
       "target_revision": 1,
       "target_value": "1E+1"
     },
@@ -15,8 +15,8 @@
         "near": true,
         "target": true
       },
-      "history_day": "2026-11-02",
-      "last": "2026-11-02T21:55:00Z",
+      "history_day": "2026-11-03",
+      "last": "2026-11-03T19:48:00Z",
       "target_revision": 1,
       "target_value": "15"
     },
@@ -25,8 +25,8 @@
         "near": true,
         "target": true
       },
-      "history_day": "2026-11-02",
-      "last": "2026-11-02T22:01:00Z",
+      "history_day": "2026-11-03",
+      "last": "2026-11-03T19:48:00Z",
       "target_revision": 1,
       "target_value": "4E+1"
     },
@@ -35,8 +35,8 @@
         "near": true,
         "target": true
       },
-      "history_day": "2026-11-02",
-      "last": "2026-11-02T22:01:00Z",
+      "history_day": "2026-11-03",
+      "last": "2026-11-03T19:48:00Z",
       "target_revision": 1,
       "target_value": "1E+2"
     }
