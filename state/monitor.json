@@ -6,17 +6,17 @@
         "target": false
       },
       "history_day": "2026-11-05",
-      "last": "2026-11-05T00:42:00Z",
+      "last": "2026-11-05T20:20:00Z",
       "target_revision": 1,
       "target_value": "1E+1"
     },
     "FLY": {
       "armed": {
-        "near": true,
-        "target": true
+        "near": false,
+        "target": false
       },
       "history_day": "2026-11-05",
-      "last": "2026-11-05T00:43:00Z",
+      "last": "2026-11-05T20:20:00Z",
       "target_revision": 1,
       "target_value": "15"
     },
@@ -26,7 +26,7 @@
         "target": true
       },
       "history_day": "2026-11-05",
-      "last": "2026-11-05T00:46:00Z",
+      "last": "2026-11-05T20:20:00Z",
       "target_revision": 1,
       "target_value": "4E+1"
     },
@@ -36,7 +36,7 @@
         "target": true
       },
       "history_day": "2026-11-05",
-      "last": "2026-11-05T00:46:00Z",
+      "last": "2026-11-05T20:20:00Z",
       "target_revision": 1,
       "target_value": "1E+2"
     }
@@ -116,6 +116,34 @@
       "target_revision": 1,
       "low": 9.865,
       "time": "2026-11-04T19:25:00Z",
+      "email": "accepted",
+      "whatsapp": "accepted",
+      "attempts": {
+        "email": 1,
+        "whatsapp": 1
+      }
+    },
+    "FLY-r1-target-2026-11-05T19:37:00Z": {
+      "symbol": "FLY",
+      "kind": "target",
+      "target": 15,
+      "target_revision": 1,
+      "low": 14.925,
+      "time": "2026-11-05T19:37:00Z",
+      "email": "accepted",
+      "whatsapp": "accepted",
+      "attempts": {
+        "email": 1,
+        "whatsapp": 1
+      }
+    },
+    "FLY-r1-target-2026-11-05T20:08:00Z": {
+      "symbol": "FLY",
+      "kind": "target",
+      "target": 15,
+      "target_revision": 1,
+      "low": 14.995,
+      "time": "2026-11-05T20:08:00Z",
       "email": "accepted",
       "whatsapp": "accepted",
       "attempts": {
