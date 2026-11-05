@@ -1,0 +1,27 @@
+name: Session-bound alert destination tests
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'feature/multi-user-alerts']
+    paths: ['worker/migrations/**', 'worker/src/account-alert-destination*.mjs', 'worker/src/account-identity.mjs', 'worker/test/account-alert-destination*.test.mjs', 'tests/schema/sqlite_d1_bridge.py', '.github/workflows/alert-destination-integration-tests.yml']
+  pull_request:
+    branches: [main]
+    paths: ['worker/migrations/**', 'worker/src/account-alert-destination*.mjs', 'worker/src/account-identity.mjs', 'worker/test/account-alert-destination*.test.mjs', 'tests/schema/sqlite_d1_bridge.py', '.github/workflows/alert-destination-integration-tests.yml']
+permissions:
+  contents: read
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run candidate routes, SQL store and session integration suites locally
+        run: node --test worker/test/account-alert-destination*.test.mjs

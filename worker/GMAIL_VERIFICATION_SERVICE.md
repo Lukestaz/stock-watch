@@ -1,0 +1,27 @@
+# Consolidated Gmail verification service: disabled, not production-wired
+
+This batch implements a narrow Gmail SMTP transport, durable request controls, a cleanup operation, a candidate service factory and a Cloudflare socket-binding module. No existing production runtime or deployment workflow imports these. Nothing is deployed or migrated, no secret is read/copied, and no real socket or email was used during local tests. Proposed migration 0008 remains unapplied, as do the earlier private alerting migrations.
+
+## Concrete SMTP transport
+
+createGmailSmtpTransport connects only to smtp.gmail.com:465 with secureTransport=on and requires the TLS socket's opened promise before SMTP commands. It supports a bounded greeting/EHLO exchange, advertised AUTH PLAIN over TLS, one sender matching the configured username, one recipient, DATA and the final 250 acknowledgement. It accepts only the fixed verification subject, an ASCII mailbox envelope and a UTF-8 body up to 8192 bytes encoded as MIME base64. The configured Gmail app password is validated as sixteen letters after removing formatting spaces. Aliases, OAuth SMTP and arbitrary SMTP hosts are not supported. No dependency package is downloaded at runtime.
+
+The overall timeout defaults to 15 seconds, configurable from 10 ms to 30 seconds; timeout closes the socket. There is no retry. Explicit post-DATA rejection is failed, while connection loss or timeout after DATA submission starts is outcome_unknown. Only final SMTP acceptance returns accepted, not delivery confirmation. Raw server details, credentials and message bodies are not logged or returned. Bounded response parsing rejects malformed/oversized replies. TLS and certificate validation rely on the Cloudflare runtime socket implementation, not the fake test socket; actual Gmail/TLS/runtime compatibility is unverified. The custom narrow protocol implementation needs review before live use.
+
+## Durable request controls and retention
+
+createD1VerificationControls uses one conditional INSERT per admitted request. Proposed default fixed-minute app policy: 30 admissions per trusted edge key, 300 global attempts per scope, 5 registration requests per account and 20 verification requests per account. Scope/account predicates and atomic database statements prevent concurrent overspending. Missing admission keys fail closed, as do storage errors and backward clock movement. Existing verification-mail budgets are unchanged and remain separate from request admission. This is not a provider-wide limit for all Gmail usage.
+
+The caller must supply admissionKey(request) from trusted deployment metadata, not a user-controlled JSON/header identity. The test X-Test-Trusted-Edge header is a fixture, never a production policy. Production must review edge metadata trust, proxies and NAT fairness. Stored actor hashes are SHA-256 pseudonymous values, not anonymized data; keep them private. Global per-scope limits bound admitted writes but cannot eliminate the cost of requests reaching the database; edge-level rate limiting is still needed.
+
+cleanup() atomically removes request/mail reservation rows older than 48 hours and challenges expired more than 48 hours ago. It preserves current quota windows and active challenges. It is a trusted method, not an HTTP endpoint, and no scheduled execution is enabled here. Cleanup must be attached to a separately reviewed schedule with an operational clock and monitored retention before production. Account-deletion/privacy handling and aggregate provider quotas remain subject to review.
+
+## Candidate composition
+
+createGmailVerificationService combines the previous budget-before-storage pipeline with the SMTP transport and real D1 controls. The separate account-gmail-socket-binding module supplies cloudflare:sockets connect. The caller must explicitly enable the candidate and supply trusted origin, database, existing-session configuration, admission key function, username and app password. Secrets must be provisioned as reviewed Worker bindings; existing GitHub Actions secrets do not automatically become Worker secrets. Do not paste credentials into chat, source, test fixtures or account rows. No environment flag alone imports this service into production. The cleanup method is exposed only to trusted code.
+
+## Verification limits and next gate
+
+Seventeen new local tests passed with fake fragmented SMTP streams and temporary SQLite control fixtures; new service/socket-binding modules passed syntax checks. Tests cover final acceptance, MIME/auth encoding, injection checks, auth/recipient/DATA rejection, opening/pre/post-DATA timeouts, unknown outcomes, request-limit isolation/concurrency, clock boundaries and selective retention. These local fixtures are targeted, not the complete migration chain. Committed CI uses the existing bridge/full chain and runs earlier verification suites too. The newly assembled service factory has not yet been exercised end-to-end against a Worker emulator or real D1; local tests exercised its SMTP and controls components plus previously tested pipeline code separately.
+
+Before live activation: review the consolidated PR/CI, run assembled-service integration tests and Worker-runtime/TLS checks, provision secrets through an approved secure process, approve private migrations and deployment, add frontend verification/independent consent, and complete account target evaluation/outbox dispatch. WhatsApp account delivery remains unavailable. No live sender or other-user alerts are enabled by this batch.

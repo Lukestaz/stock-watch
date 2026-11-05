@@ -1,0 +1,27 @@
+name: Account consent and event producer tests
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'feature/multi-user-alerts']
+    paths: ['worker/src/account-*.mjs', 'worker/test/account-*.test.mjs', 'worker/migrations/**', 'tests/schema/sqlite_d1_bridge.py', '.github/workflows/account-alert-producer-tests.yml']
+  pull_request:
+    branches: [main]
+    paths: ['worker/src/account-*.mjs', 'worker/test/account-*.test.mjs', 'worker/migrations/**', 'tests/schema/sqlite_d1_bridge.py', '.github/workflows/account-alert-producer-tests.yml']
+permissions:
+  contents: read
+jobs:
+  producer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test private consent/evaluation and assembled verification regressions
+        run: node --test worker/test/account-alert-producer.test.mjs worker/test/account-gmail-assembled.test.mjs worker/test/account-budgeted-verification.test.mjs worker/test/account-verification-service.test.mjs worker/test/account-verification-mail.test.mjs worker/test/account-alert-destination*.test.mjs worker/test/account-alert-account-guard.test.mjs worker/test/account-alert-settings.test.mjs
