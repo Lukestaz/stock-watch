@@ -1,0 +1,140 @@
+name: Simplicity browser tests
+on:
+  push:
+    branches: [feat/simplicity-fund-monitor]
+    paths:
+      - 'site/simplicity*'
+      - 'tests/dashboard/simplicity.spec.mjs'
+      - 'tests/dashboard/playwright.config.mjs'
+      - 'tests/dashboard/package.json'
+      - 'tests/dashboard/summarize-results.mjs'
+      - '.github/workflows/simplicity-browser.yml'
+permissions:
+  contents: read
+jobs:
+  browser-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: tests/dashboard
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned test runner
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+      - name: Install desktop and mobile browsers
+        run: npx playwright install --with-deps chromium webkit
+      - name: Run isolated synthetic fund browser tests
+        env:
+          CI: 'true'
+          PLAYWRIGHT_JSON_OUTPUT_NAME: results.json
+          PLAYWRIGHT_HTML_OPEN: never
+        run: npm test -- simplicity.spec.mjs --reporter=list,html,json
+      - name: Upload machine-readable results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: simplicity-browser-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tests/dashboard/results.json
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Upload synthetic browser failure evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: simplicity-browser-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tests/dashboard/playwright-report/
+            tests/dashboard/test-results/
+          retention-days: 30
+          if-no-files-found: ignore
+  publish-summary:
+    needs: browser-tests
+    if: >-
+      always() && !cancelled() && github.repository == 'Lukestaz/stock-watch' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/feat/simplicity-fund-monitor'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    concurrency:
+      group: simplicity-browser-results-publisher
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download this run's browser JSON
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: simplicity-browser-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/simplicity-browser
+      - name: Build bounded browser-job summary
+        env:
+          TEST_JOB_RESULT: ${{ needs.browser-tests.result }}
+          JSON_FILE: ${{ runner.temp }}/simplicity-browser/results.json
+          SUMMARY_FILE: ${{ runner.temp }}/simplicity-browser-summary.json
+          RESULTS_WORKFLOW: Simplicity browser tests
+          RESULTS_SOURCE_BRANCH: ${{ github.ref_name }}
+          RESULTS_PREFIX: simplicity-browser
+        run: node tests/dashboard/summarize-results.mjs
+      - name: Archive browser-job summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: simplicity-browser-summary-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/simplicity-browser-summary.json
+          retention-days: 30
+          if-no-files-found: error
+      - name: Save browser result without replacing verification results
+        uses: actions/github-script@v7
+        env:
+          SUMMARY_FILE: ${{ runner.temp }}/simplicity-browser-summary.json
+        with:
+          script: |
+            const fs = require('node:fs');
+            const text = fs.readFileSync(process.env.SUMMARY_FILE, 'utf8');
+            const summary = JSON.parse(text);
+            if (summary.testedCommit !== process.env.GITHUB_SHA || summary.runId !== process.env.GITHUB_RUN_ID || summary.runAttempt !== process.env.GITHUB_RUN_ATTEMPT || !/^\d+$/.test(summary.runId) || !/^\d+$/.test(summary.runAttempt)) throw Error('Browser result metadata mismatch');
+            const {owner, repo} = context.repo;
+            const newer = (a,b) => Number(a.runNumber) > Number(b.runNumber) || (Number(a.runNumber) === Number(b.runNumber) && Number(a.runAttempt) > Number(b.runAttempt));
+            const read = async (file, ref) => {
+              try {
+                const data = (await github.rest.repos.getContent({owner, repo, path:file, ref})).data;
+                return JSON.parse(Buffer.from(data.content, 'base64').toString('utf8'));
+              } catch (e) { if (e.status === 404) return null; throw e; }
+            };
+            for (let attempt = 0; attempt < 4; attempt++) {
+              const head = (await github.rest.git.getRef({owner, repo, ref:'heads/ci-results'})).data.object.sha;
+              const runPath = `simplicity-browser/runs/${summary.runId}-${summary.runAttempt}.json`;
+              if (await read(runPath, head)) { core.info('Browser run already recorded'); return; }
+              const base = (await github.rest.git.getCommit({owner, repo, commit_sha:head})).data.tree.sha;
+              const entry = file => ({path:file, mode:'100644', type:'blob', content:text});
+              const entries = [entry(runPath)];
+              const latest = await read('simplicity-browser/latest.json', head);
+              if (!latest || newer(summary, latest)) entries.push(entry('simplicity-browser/latest.json'));
+              if (summary.outcome === 'passed') {
+                const success = await read('simplicity-browser/latest-successful.json', head);
+                if (!success || newer(summary, success)) entries.push(entry('simplicity-browser/latest-successful.json'));
+              }
+              const tree = (await github.rest.git.createTree({owner, repo, base_tree:base, tree:entries})).data;
+              const commit = (await github.rest.git.createCommit({owner, repo, message:`Simplicity browser CI ${summary.runId}/${summary.runAttempt}: ${summary.outcome}`, tree:tree.sha, parents:[head]})).data;
+              try {
+                await github.rest.git.updateRef({owner, repo, ref:'heads/ci-results', sha:commit.sha, force:false});
+                core.info(`Saved browser outcome at ${commit.sha}`); return;
+              } catch (e) { if (![409,422].includes(e.status) || attempt === 3) throw e; }
+            }

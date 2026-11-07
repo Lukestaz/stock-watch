@@ -2,7 +2,9 @@
 
 Read README.md for the existing application architecture. For the Simplicity feature, read docs/simplicity-status.md before making changes. Check the current branch and commit: a feature-branch handover is not a statement about production.
 
-For automated outcomes, read docs/automation-outcomes.md. The existing ci-results branch is the reporting location. Read simplicity/latest.json on that branch and verify its source commit, run and timestamps; do not substitute latest-successful.json for a failed latest attempt. Publication remains unverified until a record is actually retrieved.
+For automated outcomes, read docs/automation-outcomes.md. The existing ci-results branch is the reporting location. Read simplicity/latest.json on that branch and verify its source commit, run and timestamps; do not substitute latest-successful.json for a failed latest attempt. An absent or older record does not verify current code.
+
+For the browser-test batch, read docs/simplicity-browser-status.md and ci-results:simplicity-browser/latest.json. Keep browser-job outcomes separate from the Simplicity unit/feed verification job. Test implementation and syntax checks do not establish browser execution or a passing workflow.
 
 ## Outcome records
 
