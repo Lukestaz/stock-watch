@@ -5,8 +5,8 @@
         "near": false,
         "target": true
       },
-      "history_day": "2026-11-06",
-      "last": "2026-11-06T19:39:00Z",
+      "history_day": "2026-11-07",
+      "last": "2026-11-06T23:46:00Z",
       "target_revision": 1,
       "target_value": "1E+1"
     },
@@ -15,8 +15,8 @@
         "near": true,
         "target": true
       },
-      "history_day": "2026-11-06",
-      "last": "2026-11-06T19:39:00Z",
+      "history_day": "2026-11-07",
+      "last": "2026-11-06T23:47:00Z",
       "target_revision": 1,
       "target_value": "15"
     },
@@ -25,8 +25,8 @@
         "near": true,
         "target": true
       },
-      "history_day": "2026-11-06",
-      "last": "2026-11-06T19:39:00Z",
+      "history_day": "2026-11-07",
+      "last": "2026-11-06T23:48:00Z",
       "target_revision": 1,
       "target_value": "4E+1"
     },
@@ -35,8 +35,8 @@
         "near": true,
         "target": true
       },
-      "history_day": "2026-11-06",
-      "last": "2026-11-06T19:39:00Z",
+      "history_day": "2026-11-07",
+      "last": "2026-11-06T23:48:00Z",
       "target_revision": 1,
       "target_value": "1E+2"
     }
