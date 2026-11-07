@@ -1,10 +1,13 @@
 import {createAccountApp} from './account-composition.mjs';
+import {createSimplicityRoute} from './simplicity-route.mjs';
 
 // Configuration comes only from deployment bindings, never request input.
 export function createAccountWorker({compose = createAccountApp} = {}) {
   const apps = new WeakMap();
+  const fundRoute = createSimplicityRoute();
   return {
     async fetch(request, env, ctx) {
+      if (new URL(request.url).pathname === '/api/v1/fund') return fundRoute(request, env);
       let app = apps.get(env);
       if (!app) {
         const enabled = env.ACCOUNTS_ENABLED === 'true' &&
