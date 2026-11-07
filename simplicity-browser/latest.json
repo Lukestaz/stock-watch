@@ -2,84 +2,37 @@
   "schemaVersion": 1,
   "workflow": "Simplicity browser tests",
   "sourceBranch": "feat/simplicity-fund-monitor",
-  "testedCommit": "218b603105b4d7648489d050fb92379af8b60c68",
-  "runId": "42420288469",
-  "runNumber": "1",
+  "testedCommit": "b80f918f2e34b8b064802654b87d0f8536d9bee5",
+  "runId": "42421257083",
+  "runNumber": "2",
   "runAttempt": "1",
-  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/42420288469",
-  "generatedAt": "2026-11-07T22:25:50.260Z",
-  "jobResult": "failure",
-  "outcome": "failed",
+  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/42421257083",
+  "generatedAt": "2026-11-07T22:36:00.633Z",
+  "jobResult": "success",
+  "outcome": "passed",
   "reportState": "available",
   "reportError": null,
   "counts": {
-    "passed": 18,
-    "failed": 6,
+    "passed": 24,
+    "failed": 0,
     "flaky": 0,
     "skipped": 0
   },
   "browsers": {
     "chromium-desktop": {
-      "passed": 9,
-      "failed": 3,
+      "passed": 12,
+      "failed": 0,
       "flaky": 0,
       "skipped": 0
     },
     "webkit-mobile": {
-      "passed": 9,
-      "failed": 3,
+      "passed": 12,
+      "failed": 0,
       "flaky": 0,
       "skipped": 0
     }
   },
-  "failures": [
-    {
-      "browser": "chromium-desktop",
-      "title": "simplicity.spec.mjs > history range redraws locally without another API request",
-      "errors": [
-        "Test timeout of 30000ms exceeded.",
-        "Error: locator.selectOption: Test timeout of 30000ms exceeded.\nCall log:\n  - waiting for getByLabel('History', { exact: true })\n\n\n  53 | test('history range redraws locally without another API request', async ({ page }) => {\n  54 |   await page.goto('/simplicity.html'); await loaded(page);\n> 55 |   await page.getByLabel('History', { exact: true }).selectOption('all');\n     |                                                     ^\n  56 |   await expect(page.locator('#extent')).toContainText('2025-01-01 to 2026-11-04');\n  57 |   expect((await page.locator('#line').getAttribute('points')).split(' ')).toHaveLength(41);\n  58 |   await page.getByLabel('History', { exact: true }).selectOption('180');\n    at /home/runner/work/stock-watch/stock-watch/tests/dashboard/simplicity.spec.mjs:55:53"
-      ]
-    },
-    {
-      "browser": "webkit-mobile",
-      "title": "simplicity.spec.mjs > history range redraws locally without another API request",
-      "errors": [
-        "Test timeout of 30000ms exceeded.",
-        "Error: locator.selectOption: Test timeout of 30000ms exceeded.\nCall log:\n  - waiting for getByLabel('History', { exact: true })\n\n\n  53 | test('history range redraws locally without another API request', async ({ page }) => {\n  54 |   await page.goto('/simplicity.html'); await loaded(page);\n> 55 |   await page.getByLabel('History', { exact: true }).selectOption('all');\n     |                                                     ^\n  56 |   await expect(page.locator('#extent')).toContainText('2025-01-01 to 2026-11-04');\n  57 |   expect((await page.locator('#line').getAttribute('points')).split(' ')).toHaveLength(41);\n  58 |   await page.getByLabel('History', { exact: true }).selectOption('180');\n    at /home/runner/work/stock-watch/stock-watch/tests/dashboard/simplicity.spec.mjs:55:53"
-      ]
-    },
-    {
-      "browser": "chromium-desktop",
-      "title": "simplicity.spec.mjs > late first response cannot overwrite a more recent fund selection even if abort is ignored",
-      "errors": [
-        "Test timeout of 30000ms exceeded.",
-        "Error: locator.selectOption: Test timeout of 30000ms exceeded.\nCall log:\n  - waiting for getByLabel('Fund', { exact: true })\n\n\n  123 |   await page.waitForFunction(() => typeof window.releaseFirstFund === 'function');\n  124 |   await expect(page.getByRole('button', { name: 'Check data' })).toBeDisabled();\n> 125 |   await page.getByLabel('Fund', { exact: true }).selectOption(growth); await loaded(page);\n      |                                                  ^\n  126 |   await expect(page.locator('#price')).toHaveText('NZD 2.3900 per unit');\n  127 |   await page.evaluate(async () => { window.releaseFirstFund(); await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); });\n  128 |   await expect(page.locator('#name')).toHaveText('KiwiSaver - Growth');\n    at /home/runner/work/stock-watch/stock-watch/tests/dashboard/simplicity.spec.mjs:125:50"
-      ]
-    },
-    {
-      "browser": "webkit-mobile",
-      "title": "simplicity.spec.mjs > late first response cannot overwrite a more recent fund selection even if abort is ignored",
-      "errors": [
-        "Test timeout of 30000ms exceeded.",
-        "Error: locator.selectOption: Test timeout of 30000ms exceeded.\nCall log:\n  - waiting for getByLabel('Fund', { exact: true })\n\n\n  123 |   await page.waitForFunction(() => typeof window.releaseFirstFund === 'function');\n  124 |   await expect(page.getByRole('button', { name: 'Check data' })).toBeDisabled();\n> 125 |   await page.getByLabel('Fund', { exact: true }).selectOption(growth); await loaded(page);\n      |                                                  ^\n  126 |   await expect(page.locator('#price')).toHaveText('NZD 2.3900 per unit');\n  127 |   await page.evaluate(async () => { window.releaseFirstFund(); await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); });\n  128 |   await expect(page.locator('#name')).toHaveText('KiwiSaver - Growth');\n    at /home/runner/work/stock-watch/stock-watch/tests/dashboard/simplicity.spec.mjs:125:50"
-      ]
-    },
-    {
-      "browser": "chromium-desktop",
-      "title": "simplicity.spec.mjs > controls are labelled and reachable by keyboard, including refresh activation",
-      "errors": [
-        "Error: expect(locator).toBeFocused() failed\n\nLocator: getByLabel('Fund', { exact: true })\nExpected: focused\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n  - Expect \"toBeFocused\" getByLabel('Fund', { exact: true }) with timeout 5000ms\n  - waiting for getByLabel('Fund', { exact: true })\n\n\n  133 |   await page.goto('/simplicity.html'); await loaded(page);\n  134 |   await page.getByRole('link', { name: 'Back to stocks' }).focus();\n> 135 |   await page.keyboard.press('Tab'); await expect(page.getByLabel('Fund', { exact: true })).toBeFocused();\n      |                                                                                            ^\n  136 |   await page.keyboard.press('Tab'); await expect(page.getByRole('button', { name: 'Check data' })).toBeFocused();\n  137 |   await page.keyboard.press('Enter');\n  138 |   await expect.poll(() => page.fundRequests.length).toBe(2); await loaded(page);\n    at /home/runner/work/stock-watch/stock-watch/tests/dashboard/simplicity.spec.mjs:135:92"
-      ]
-    },
-    {
-      "browser": "webkit-mobile",
-      "title": "simplicity.spec.mjs > controls are labelled and reachable by keyboard, including refresh activation",
-      "errors": [
-        "Error: expect(locator).toBeFocused() failed\n\nLocator: getByLabel('Fund', { exact: true })\nExpected: focused\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n  - Expect \"toBeFocused\" getByLabel('Fund', { exact: true }) with timeout 5000ms\n  - waiting for getByLabel('Fund', { exact: true })\n\n\n  133 |   await page.goto('/simplicity.html'); await loaded(page);\n  134 |   await page.getByRole('link', { name: 'Back to stocks' }).focus();\n> 135 |   await page.keyboard.press('Tab'); await expect(page.getByLabel('Fund', { exact: true })).toBeFocused();\n      |                                                                                            ^\n  136 |   await page.keyboard.press('Tab'); await expect(page.getByRole('button', { name: 'Check data' })).toBeFocused();\n  137 |   await page.keyboard.press('Enter');\n  138 |   await expect.poll(() => page.fundRequests.length).toBe(2); await loaded(page);\n    at /home/runner/work/stock-watch/stock-watch/tests/dashboard/simplicity.spec.mjs:135:92"
-      ]
-    }
-  ],
+  "failures": [],
   "skips": [],
   "errors": []
 }

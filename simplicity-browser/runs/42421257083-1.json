@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "workflow": "Simplicity browser tests",
+  "sourceBranch": "feat/simplicity-fund-monitor",
+  "testedCommit": "b80f918f2e34b8b064802654b87d0f8536d9bee5",
+  "runId": "42421257083",
+  "runNumber": "2",
+  "runAttempt": "1",
+  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/42421257083",
+  "generatedAt": "2026-11-07T22:36:00.633Z",
+  "jobResult": "success",
+  "outcome": "passed",
+  "reportState": "available",
+  "reportError": null,
+  "counts": {
+    "passed": 24,
+    "failed": 0,
+    "flaky": 0,
+    "skipped": 0
+  },
+  "browsers": {
+    "chromium-desktop": {
+      "passed": 12,
+      "failed": 0,
+      "flaky": 0,
+      "skipped": 0
+    },
+    "webkit-mobile": {
+      "passed": 12,
+      "failed": 0,
+      "flaky": 0,
+      "skipped": 0
+    }
+  },
+  "failures": [],
+  "skips": [],
+  "errors": []
+}
