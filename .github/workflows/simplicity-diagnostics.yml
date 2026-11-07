@@ -6,22 +6,37 @@ on:
       - '.github/workflows/simplicity-diagnostics.yml'
       - 'scripts/simplicity-diagnostics.mjs'
       - 'worker/src/simplicity-*.mjs'
+      - 'worker/src/account-*.mjs'
       - 'worker/test/simplicity-*.mjs'
+      - 'worker/test/account-*.mjs'
+      - 'worker/migrations/**'
+      - 'tests/schema/**'
+      - 'site/simplicity*'
+      - 'site/index.html'
 permissions:
   contents: read
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Run isolated tests
+      - name: Run Simplicity unit and SQLite integration tests
         run: node --test worker/test/simplicity-*.test.mjs
+      - name: Run existing account and runtime regressions
+        if: always()
+        run: node --test worker/test/account-*.test.mjs
+      - name: Check fund UI module syntax
+        if: always()
+        run: node --check site/simplicity.js
       - name: Fetch complete public feeds
         if: always()
         run: node scripts/simplicity-diagnostics.mjs
