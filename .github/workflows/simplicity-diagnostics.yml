@@ -1,0 +1,27 @@
+name: Simplicity feed diagnostics
+on:
+  push:
+    branches: [feat/simplicity-fund-monitor]
+    paths:
+      - '.github/workflows/simplicity-diagnostics.yml'
+      - 'scripts/simplicity-diagnostics.mjs'
+      - 'worker/src/simplicity-*.mjs'
+      - 'worker/test/simplicity-*.mjs'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run isolated tests
+        run: node --test worker/test/simplicity-*.test.mjs
+      - name: Fetch complete public feeds
+        if: always()
+        run: node scripts/simplicity-diagnostics.mjs
