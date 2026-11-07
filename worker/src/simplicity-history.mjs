@@ -1,7 +1,7 @@
-const SERIES = new Set(['simplicity:kiwisaver:high-growth', 'simplicity:investment:high-growth']);
+import { getSimplicityFund } from './simplicity-catalogue.mjs';
 
 export function parseSimplicityHistory(text, seriesId) {
-  if (!SERIES.has(seriesId)) throw new Error('Explicit supported series identity required');
+  if (!getSimplicityFund(seriesId)) throw new Error('Explicit supported series identity required');
   if (typeof text !== 'string') throw new Error('CSV text required');
   const lines = text.replace(/^\uFEFF/, '').trim().split(/\r?\n/);
   if (lines.shift()?.trim() !== 'Date,Price') throw new Error('Unexpected CSV header');
