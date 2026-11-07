@@ -19,12 +19,12 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      OUTCOME_DIR: ${{ runner.temp }}/simplicity-checks
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Initialise outcome directory environment
+        run: echo "OUTCOME_DIR=$RUNNER_TEMP/simplicity-checks" >> "$GITHUB_ENV"
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -63,13 +63,13 @@ jobs:
     concurrency:
       group: simplicity-results-publisher
       cancel-in-progress: false
-    env:
-      OUTCOME_DIR: ${{ runner.temp }}/simplicity-checks
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
+      - name: Initialise outcome directory environment
+        run: echo "OUTCOME_DIR=$RUNNER_TEMP/simplicity-checks" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
