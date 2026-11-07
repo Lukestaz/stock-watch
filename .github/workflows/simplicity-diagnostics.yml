@@ -4,7 +4,7 @@ on:
     branches: [feat/simplicity-fund-monitor]
     paths:
       - '.github/workflows/simplicity-diagnostics.yml'
-      - 'scripts/simplicity-diagnostics.mjs'
+      - 'scripts/simplicity-*.mjs'
       - 'worker/src/simplicity-*.mjs'
       - 'worker/src/account-*.mjs'
       - 'worker/test/simplicity-*.mjs'
@@ -18,7 +18,9 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    env:
+      OUTCOME_DIR: ${{ runner.temp }}/simplicity-checks
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,13 +32,102 @@ jobs:
         with:
           node-version: '22'
       - name: Run Simplicity unit and SQLite integration tests
-        run: node --test worker/test/simplicity-*.test.mjs
+        run: node scripts/simplicity-outcomes.mjs simplicity
       - name: Run existing account and runtime regressions
         if: always()
-        run: node --test worker/test/account-*.test.mjs
+        run: node scripts/simplicity-outcomes.mjs accounts
       - name: Check fund UI module syntax
         if: always()
-        run: node --check site/simplicity.js
+        run: node scripts/simplicity-outcomes.mjs ui
       - name: Fetch complete public feeds
         if: always()
-        run: node scripts/simplicity-diagnostics.mjs
+        run: node scripts/simplicity-outcomes.mjs feeds
+      - name: Preserve sanitised check records
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: simplicity-checks-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/simplicity-checks/*.json
+          retention-days: 30
+          if-no-files-found: warn
+  publish-summary:
+    needs: verify
+    if: >-
+      always() && !cancelled() && github.repository == 'Lukestaz/stock-watch' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/feat/simplicity-fund-monitor'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    concurrency:
+      group: simplicity-results-publisher
+      cancel-in-progress: false
+    env:
+      OUTCOME_DIR: ${{ runner.temp }}/simplicity-checks
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download this run's check records
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: simplicity-checks-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/simplicity-checks
+      - name: Build explicit verification-job outcome
+        env:
+          TEST_JOB_RESULT: ${{ needs.verify.result }}
+        run: node scripts/simplicity-outcomes.mjs summary
+      - name: Archive outcome and readable summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: simplicity-outcome-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/simplicity-checks/outcome.json
+            ${{ runner.temp }}/simplicity-checks/summary.md
+          retention-days: 30
+          if-no-files-found: error
+      - name: Publish on existing results-only branch
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('node:fs');
+            const path = require('node:path');
+            const {pathToFileURL} = require('node:url');
+            const {newer} = await import(pathToFileURL(path.resolve('scripts/simplicity-outcomes.mjs')).href);
+            const text = fs.readFileSync(path.join(process.env.OUTCOME_DIR, 'outcome.json'), 'utf8');
+            const markdown = fs.readFileSync(path.join(process.env.OUTCOME_DIR, 'summary.md'), 'utf8');
+            const summary = JSON.parse(text);
+            if (summary.repository !== process.env.GITHUB_REPOSITORY || summary.sourceSha !== process.env.GITHUB_SHA || summary.runId !== process.env.GITHUB_RUN_ID || summary.runAttempt !== process.env.GITHUB_RUN_ATTEMPT || !/^\d+$/.test(summary.runId) || !/^\d+$/.test(summary.runAttempt)) throw Error('Outcome metadata mismatch');
+            const {owner, repo} = context.repo;
+            const read = async (file, ref) => {
+              try {
+                const data = (await github.rest.repos.getContent({owner, repo, path:file, ref})).data;
+                return JSON.parse(Buffer.from(data.content, 'base64').toString('utf8'));
+              } catch (e) { if (e.status === 404) return null; throw e; }
+            };
+            for (let attempt = 0; attempt < 4; attempt++) {
+              const head = (await github.rest.git.getRef({owner, repo, ref:'heads/ci-results'})).data.object.sha;
+              const runPath = `simplicity/runs/${summary.runId}-${summary.runAttempt}.json`;
+              if (await read(runPath, head)) { core.info('Run outcome already recorded'); return; }
+              const base = (await github.rest.git.getCommit({owner, repo, commit_sha:head})).data.tree.sha;
+              const entry = (file, content) => ({path:file, mode:'100644', type:'blob', content});
+              const entries = [entry(runPath, text)];
+              const latest = await read('simplicity/latest.json', head);
+              if (!latest || newer(summary, latest)) entries.push(entry('simplicity/latest.json', text), entry('simplicity/latest.md', markdown));
+              if (summary.outcome === 'passed') {
+                const success = await read('simplicity/latest-successful.json', head);
+                if (!success || newer(summary, success)) entries.push(entry('simplicity/latest-successful.json', text));
+              }
+              const tree = (await github.rest.git.createTree({owner, repo, base_tree:base, tree:entries})).data;
+              const commit = (await github.rest.git.createCommit({owner, repo, message:`Simplicity CI ${summary.runId}/${summary.runAttempt}: ${summary.outcome}`, tree:tree.sha, parents:[head]})).data;
+              try {
+                await github.rest.git.updateRef({owner, repo, ref:'heads/ci-results', sha:commit.sha, force:false});
+                core.info(`Saved outcome at ${commit.sha}`); return;
+              } catch (e) { if (![409,422].includes(e.status) || attempt === 3) throw e; }
+            }
