@@ -2,19 +2,19 @@
   "schemaVersion": 1,
   "scope": "simplicity-verification-job",
   "repository": "Lukestaz/stock-watch",
-  "sourceSha": "b80f918f2e34b8b064802654b87d0f8536d9bee5",
+  "sourceSha": "05098bcfab54674a8138028990adc3059f2dac64",
   "sourceRef": "refs/heads/feat/simplicity-fund-monitor",
-  "runId": "42421256771",
-  "runNumber": "10",
+  "runId": "42467401239",
+  "runNumber": "11",
   "runAttempt": "1",
-  "recordedAt": "2026-11-07T22:35:05.828Z",
+  "recordedAt": "2026-11-08T09:30:07.030Z",
   "jobResult": "success",
   "checks": {
     "simplicity": {
       "schemaVersion": 1,
       "name": "simplicity",
-      "startedAt": "2026-11-07T22:34:42.203Z",
-      "completedAt": "2026-11-07T22:34:44.070Z",
+      "startedAt": "2026-11-08T09:29:46.107Z",
+      "completedAt": "2026-11-08T09:29:48.015Z",
       "processExitCode": 0,
       "status": "passed",
       "counts": {
@@ -28,8 +28,8 @@
     "accounts": {
       "schemaVersion": 1,
       "name": "accounts",
-      "startedAt": "2026-11-07T22:34:44.137Z",
-      "completedAt": "2026-11-07T22:34:49.674Z",
+      "startedAt": "2026-11-08T09:29:48.082Z",
+      "completedAt": "2026-11-08T09:29:52.407Z",
       "processExitCode": 0,
       "status": "passed",
       "counts": {
@@ -43,16 +43,16 @@
     "ui": {
       "schemaVersion": 1,
       "name": "ui",
-      "startedAt": "2026-11-07T22:34:49.743Z",
-      "completedAt": "2026-11-07T22:34:49.772Z",
+      "startedAt": "2026-11-08T09:29:52.466Z",
+      "completedAt": "2026-11-08T09:29:52.492Z",
       "processExitCode": 0,
       "status": "passed"
     },
     "feeds": {
       "schemaVersion": 1,
       "name": "feeds",
-      "startedAt": "2026-11-07T22:34:49.816Z",
-      "completedAt": "2026-11-07T22:34:54.567Z",
+      "startedAt": "2026-11-08T09:29:52.534Z",
+      "completedAt": "2026-11-08T09:29:57.377Z",
       "processExitCode": 0,
       "status": "passed",
       "feeds": [
@@ -123,5 +123,5 @@
   "deployed": false,
   "remoteMigrationApplied": false,
   "alertsActivated": false,
-  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/42421256771"
+  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/42467401239"
 }
