@@ -2,31 +2,31 @@
   "schemaVersion": 1,
   "workflow": "Dashboard regression tests",
   "sourceBranch": "main",
-  "testedCommit": "4f28c89ee5298b9b983ad590068ee514a2bb2ec7",
-  "runId": "41020658650",
-  "runNumber": "12",
+  "testedCommit": "40986bd5e34c7e38bd349607446130699d9e8c25",
+  "runId": "42467661787",
+  "runNumber": "27",
   "runAttempt": "1",
-  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/41020658650",
-  "generatedAt": "2026-10-30T07:33:21.722Z",
+  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/42467661787",
+  "generatedAt": "2026-11-08T09:34:37.825Z",
   "jobResult": "success",
   "outcome": "passed",
   "reportState": "available",
   "reportError": null,
   "counts": {
-    "passed": 46,
+    "passed": 70,
     "failed": 0,
     "flaky": 0,
     "skipped": 2
   },
   "browsers": {
     "chromium-desktop": {
-      "passed": 23,
+      "passed": 35,
       "failed": 0,
       "flaky": 0,
       "skipped": 1
     },
     "webkit-mobile": {
-      "passed": 23,
+      "passed": 35,
       "failed": 0,
       "flaky": 0,
       "skipped": 1
