@@ -1,7 +1,20 @@
 name: Simplicity feed diagnostics
 on:
   push:
-    branches: [feat/simplicity-fund-monitor]
+    branches: [main, feat/simplicity-fund-monitor]
+    paths:
+      - '.github/workflows/simplicity-diagnostics.yml'
+      - 'scripts/simplicity-*.mjs'
+      - 'worker/src/simplicity-*.mjs'
+      - 'worker/src/account-*.mjs'
+      - 'worker/test/simplicity-*.mjs'
+      - 'worker/test/account-*.mjs'
+      - 'worker/migrations/**'
+      - 'tests/schema/**'
+      - 'site/simplicity*'
+      - 'site/index.html'
+  pull_request:
+    branches: [main]
     paths:
       - '.github/workflows/simplicity-diagnostics.yml'
       - 'scripts/simplicity-*.mjs'
@@ -54,7 +67,8 @@ jobs:
     needs: verify
     if: >-
       always() && !cancelled() && github.repository == 'Lukestaz/stock-watch' &&
-      github.event_name == 'push' && github.ref == 'refs/heads/feat/simplicity-fund-monitor'
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feat/simplicity-fund-monitor')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

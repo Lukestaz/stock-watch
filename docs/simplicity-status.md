@@ -1,48 +1,51 @@
 # Simplicity feature handover
 
-Updated: 2026-11-08 NZDT. Repository: Lukestaz/stock-watch. Branch: feat/simplicity-fund-monitor. Code checkpoint before this documentation commit: 0f5dcb82c95663f26851f85df912617b96e88e2e.
+Updated 2026-11-08 NZDT for PR #5: https://github.com/Lukestaz/stock-watch/pull/5. Source branch: feat/simplicity-fund-monitor. Last verified application checkpoint: b80f918f2e34b8b064802654b87d0f8536d9bee5. The subsequent CI/docs follow-up is not covered by those earlier results until its own checks complete.
 
-## Outcome
+## Outcome and review
 
-Read-only fund ingestion, health helpers, D1 storage, API wiring and a standalone UI are committed on this branch. No deployment, remote migration or feature activation was performed in this session. No pull request was created in this session. Verify current remote state before rollout; this document is not a live inventory.
+Read-only fund ingestion, D1 persistence, a gated API, standalone UI and agent-readable CI reporting are implemented. The page passed synthetic desktop/mobile browser tests at the checkpoint above. PR #5 is open, not merged. No remote migration, preview/production deployment, feature activation or alert delivery was performed as part of this work. Verify current remote state before rollout.
+
+The complete original PR diff against main at 16daf175ab036ca604803dca65761a9e2924cc33 was statically reviewed: 34 files, 1,640 additions, two deletions, 16 commits. No obvious application-code blocker was found; this is not formal approval or proof that all runtime risks are excluded. Findings were branch-only Simplicity CI and outdated handovers. This follow-up extends CI to PR/main and refreshes the handovers; fresh checks are required before closing those findings.
 
 ## Implementation map
 
-- worker/src/simplicity-catalogue.mjs: six KiwiSaver and eleven Investment identities; entries remain disabled.
-- worker/src/simplicity-history.mjs and simplicity-fetch.mjs: explicit series parsing, validated CSV, bounded download and timeout.
-- worker/src/simplicity-feed-health.mjs: ten download-evidence mappings, explicitly attributed to user-supplied Actions output; dated-price checks and explicit expected-date freshness assessment.
-- worker/src/simplicity-snapshot.mjs: compact price snapshots; identityVerified and alertEligible remain false.
-- worker/migrations/0005_simplicity.sql: public simplicity_fetch_state and simplicity_observations tables. Not applied remotely in this session. Use the existing database architecture; do not assume a preview DB is isolated.
-- worker/src/simplicity-store.mjs: per-date observations, 90-second refresh leases, fenced atomic history replacement, one-hour retrieval TTL and 60-second failure backoff. Corrections replace current observations; no historical revision audit trail exists.
-- worker/src/simplicity-route.mjs: GET /api/v1/fund?series=..., gated by SIMPLICITY_READ_ONLY='true', origin checks and ACCOUNT_LIMIT. Requires env.DB. No in-memory price cache or upstream bypass on D1 failure. Last-successful fallback is explicitly stale and bounded to seven days since the last successful check.
+- worker/src/simplicity-catalogue.mjs: six KiwiSaver and eleven Investment identities; monitoring and alerts remain disabled.
+- simplicity-history.mjs and simplicity-fetch.mjs: explicit series identity, validated CSV, bounded downloads and timeout.
+- simplicity-feed-health.mjs and simplicity-snapshot.mjs: ten download-evidence mappings, explicit expected-date freshness assessment and compact snapshots. identityVerified and alertEligible remain false.
+- worker/migrations/0005_simplicity.sql: public fetch-state and observation tables. No private positions or account balances. Not applied remotely by this work.
+- simplicity-store.mjs: per-date observations, 90-second refresh leases, fenced atomic replacement, one-hour retrieval TTL and 60-second failure backoff. Corrections replace observations; no historical revision audit trail exists.
+- simplicity-route.mjs: GET /api/v1/fund?series=..., gated by SIMPLICITY_READ_ONLY='true', origin checks and ACCOUNT_LIMIT. Requires D1; no in-memory/upstream bypass on database failure. Last-successful fallback is explicitly stale and limited to seven days since the last successful check.
 - worker/src/account-runtime.mjs: intercepts the fund route; existing account composition otherwise retained.
-- site/simplicity.html, simplicity.js and simplicity-view.mjs: standalone read-only screen with grouped fund choices, price chart and recent observations. Not linked from the stock dashboard. No private positions or alerts implemented.
-- scripts/simplicity-diagnostics.mjs and .github/workflows/simplicity-diagnostics.yml: branch-only public feed probes, snapshot sanity checks, Simplicity tests, account regressions and UI syntax check. No deployment or remote DB migration step.
+- site/simplicity.html, simplicity.js and simplicity-view.mjs: read-only grouped fund choices, price chart and recent observations. Not linked from the stock dashboard. No personal positions or alerts.
+- scripts/simplicity-diagnostics.mjs, simplicity-outcomes.mjs and the two Simplicity workflows: verification, public probes, isolated browser tests and readable results. This follow-up adds matching PR/main triggers while restricting repository-writing publishers to trusted main/feature pushes.
 
-## Evidence and provenance
+## Verified evidence
 
-The user pasted Actions output for these completed test steps after code checkpoint 0f5dcb8:
+For b80f918, connector-retrieved results on ci-results establish:
 
-- node --test worker/test/account-*.test.mjs: 95 passed, zero failed/skipped/cancelled; approximately 4.45 seconds.
-- node --test worker/test/simplicity-*.test.mjs: 60 passed, zero failed/skipped/cancelled; approximately 1.85 seconds. Includes actual fetch-adapter/parser/snapshot/store/API pipeline tests using fixture HTTP responses and file-backed SQLite. This is not live Cloudflare D1 verification.
+- Verification run 42421256771, number 10, attempt 1: 65/65 Simplicity tests and 95/95 account/runtime tests passed, zero failed/skipped/cancelled; UI syntax passed; all ten feeds returned HTTP 200 and parsed. https://github.com/Lukestaz/stock-watch/actions/runs/42421256771
+- Browser run 42421257083, number 2, attempt 1: 24/24 passed, 12 each in desktop Chromium and mobile WebKit, zero failed/flaky/skipped. https://github.com/Lukestaz/stock-watch/actions/runs/42421257083
+- GitHub's check-runs API independently confirmed those jobs and both publishers succeeded. The new PR adapter, schema, alert-regressions and broader dashboard browser jobs also reported success for that head; the dashboard PR publisher was skipped.
 
-These are user-supplied logs, not independently retrieved Actions run records. No run ID or complete workflow conclusion was available.
+Account integration fixtures apply all migrations in order, giving local SQLite coexistence coverage. Simplicity fixtures exercise real parsing/snapshot/storage/API paths against file-backed SQLite and fixture HTTP. Neither establishes live Cloudflare D1 compatibility or bindings. Earlier user-pasted logs were historical evidence; the retrieved records above supersede the old statement that no run IDs or browser results were available.
 
-Earlier user-supplied live-probe output confirmed HTTP 200, CSV parsing and snapshots for ten feeds: KiwiSaver High Growth, Growth, Balanced, Default, Conservative and Defensive; Investment High Growth, Growth, Balanced and Conservative. All reported latest observation 2026-11-04 when fetched 2026-11-07. Bodies were approximately 16-46 KB. Both High Growth launch-price checks matched 1.0 on 2023-05-02. This is a sanity check, not independent identity verification. Earlier chat web-retrieval partials/failures did not reflect the successful complete runtime downloads.
+The ten downloaded feeds are KiwiSaver High Growth, Growth, Balanced, Default, Conservative and Defensive; Investment High Growth, Growth, Balanced and Conservative. At the checkpoint they reported latest observation 2026-11-04. Shared High Growth launch-price checks are sanity checks, not independent identity verification.
 
-## Important limitations
+## Remaining limitations
 
-- Publication freshness remains unchecked unless an expected observation date is explicitly supplied. No provider publication schedule or holiday policy has been established. Cache TTL does not establish observation freshness.
-- Independent feed identity verification remains incomplete. Do not enable alerts based on successful parsing or the shared launch-price check alone.
-- Seven other Investment endpoint mappings remain unresolved: Homes and Income, NZ Share, NZ Bond, NZ Cash, Hedged Global Share, Unhedged Global Share and Hedged Global Bond. Catalogue presence is not endpoint verification.
-- Browser rendering, keyboard/mobile interaction, stale/error UI and rapid-selection behaviour have not been browser-tested. UI helper tests and syntax checks are not browser tests.
-- Live D1 SQL compatibility, migration application, cold/warm API reads, durable refresh coordination and deployment bindings remain unverified remotely. Local SQLite tests cannot establish those outcomes.
-- Personal positions, re-entry rules, persistent alert delivery state and scheduled fund monitoring are not implemented. Earlier illustrative thresholds were not adopted.
+- Publication freshness is unchecked unless an expected date is explicitly supplied. No provider publication schedule or holiday policy is established; cache TTL does not establish observation freshness.
+- Independent feed identity verification is incomplete. Parsing success and a shared launch price cannot enable alerts.
+- Seven Investment mappings remain unresolved: Homes and Income, NZ Share, NZ Bond, NZ Cash, Hedged Global Share, Unhedged Global Share and Hedged Global Bond. Catalogue presence is not endpoint verification.
+- Live D1 SQL, migration application, cold/warm API reads, durable remote coordination and deployment bindings remain unverified. Do not assume a preview DB is isolated or reuse production silently.
+- Personal positions, re-entry rules, persistent fund-alert delivery and scheduled fund monitoring are not implemented. Earlier illustrative thresholds were not adopted.
 
-## Next steps
+## Next steps and boundaries
 
-1. Browser-test the standalone page with mocked successful, stale, unavailable, disabled and out-of-order API responses. Add a dashboard navigation link when ready.
-2. Review the branch and its actual CI conclusions; do not rerun identical live downloads merely for reassurance.
-3. Discover and verify deployment configuration and a genuinely non-production D1 target before preparing a preview. Do not silently reuse production bindings.
-4. Obtain explicit approval for the resolved migration/deployment actions. Apply migration 0005 only to the approved target, deploy preview, and verify cold fetch, persistent subsequent reads, failures and feature gating in Cloudflare.
-5. Resolve identity and publication-freshness policy before any alert activation. Keep public prices and user-scoped financial data separate.
+1. Verify fresh CI on the follow-up commit, including read-only PR tests and skipped PR publishers; review mergeability and the current diff before any separate merge approval.
+2. Read docs/automation-outcomes.md and docs/simplicity-browser-status.md; always match result branch/commit, rather than accepting an old latest-successful record.
+3. Prepare dashboard navigation only as a separate reviewed change. Discover a genuinely non-production D1 target and deployment configuration before proposing preview work.
+4. Obtain explicit approval for resolved migration/deployment targets; apply 0005 only to the approved database, deploy approved preview and verify gating, persistence and failures.
+5. Resolve independent identity and publication-freshness policy before alert activation. Keep public prices separate from user-scoped financial data.
+
+The reviewed app deployment workflow is manual and pinned to a separate release; this PR is not deployment approval. No merge, deployment, migration, provider setup or notification action is authorised by the CI/docs follow-up.

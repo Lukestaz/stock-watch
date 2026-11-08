@@ -1,7 +1,16 @@
 name: Simplicity browser tests
 on:
   push:
-    branches: [feat/simplicity-fund-monitor]
+    branches: [main, feat/simplicity-fund-monitor]
+    paths:
+      - 'site/simplicity*'
+      - 'tests/dashboard/simplicity.spec.mjs'
+      - 'tests/dashboard/playwright.config.mjs'
+      - 'tests/dashboard/package.json'
+      - 'tests/dashboard/summarize-results.mjs'
+      - '.github/workflows/simplicity-browser.yml'
+  pull_request:
+    branches: [main]
     paths:
       - 'site/simplicity*'
       - 'tests/dashboard/simplicity.spec.mjs'
@@ -61,7 +70,8 @@ jobs:
     needs: browser-tests
     if: >-
       always() && !cancelled() && github.repository == 'Lukestaz/stock-watch' &&
-      github.event_name == 'push' && github.ref == 'refs/heads/feat/simplicity-fund-monitor'
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feat/simplicity-fund-monitor')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
