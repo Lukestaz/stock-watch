@@ -1,6 +1,6 @@
 import { parseSimplicityHistory } from './simplicity-history.mjs';
 
-export async function fetchSimplicityHistory(fund, { fetchImpl = fetch, now = () => new Date(), timeoutMs = 10000 } = {}) {
+export async function fetchSimplicityHistory(fund, { fetchImpl = (input, init) => globalThis.fetch(input, init), now = () => new Date(), timeoutMs = 10000 } = {}) {
   if (fund?.verificationStatus !== 'verified' || !fund.feedUrl) throw new Error('Verified feed mapping required');
   const url = new URL(fund.feedUrl);
   if (url.origin !== 'https://simplicity.kiwi' || url.pathname !== '/api/download_prices' || url.username || url.password || url.hash || !url.searchParams.get('fund_name')) throw new Error('Invalid feed URL');
@@ -9,7 +9,7 @@ export async function fetchSimplicityHistory(fund, { fetchImpl = fetch, now = ()
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let reader;
   try {
-    const response = await fetchImpl(url.toString(), { signal: controller.signal, redirect: 'error', headers: { Accept: 'text/csv, text/plain;q=0.9' } });
+    const response = await fetchImpl(url.toString(), { signal: controller.signal, redirect: 'manual', headers: { Accept: 'text/csv, text/plain;q=0.9' } });
     if (!response.ok) throw new Error(`Feed HTTP ${response.status}`);
     const contentType = response.headers.get('content-type') ?? '';
     if (/html|json/i.test(contentType)) throw new Error('Unexpected response type');
