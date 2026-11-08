@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "b8fd856a944f3332eaf5cf75261a1e157b24e661",
+  "sourceRef": "refs/heads/feat/simplicity-preview-release",
+  "releaseSha": "b8fd856a944f3332eaf5cf75261a1e157b24e661",
+  "runId": "42472490800",
+  "runNumber": "1",
+  "runAttempt": "1",
+  "worker": "stock-watch-app",
+  "databaseId": "4cb54afc-8f2d-4f62-8b6b-7d59f343b938",
+  "stage": "complete",
+  "outcome": "failed",
+  "migrationRequested": false,
+  "deploymentAttempted": true,
+  "deploymentVerified": true,
+  "refreshRestored": false,
+  "automaticRollbackPerformed": false,
+  "previousBuild": "40986bd5e34c7e38bd349607446130699d9e8c25",
+  "updatedAt": "2026-11-08T10:41:58.240Z",
+  "previousDeploymentId": "cd9464b5-35b5-4f9e-83ac-9b913edb9c7b",
+  "previousVersionId": "f1c46b38-1855-484a-8454-6f890b9d3244",
+  "secretBindingNamesPreserved": true,
+  "pageInitialStatus": 307,
+  "pageCanonicalPath": "/simplicity",
+  "pageVerified": true,
+  "fundHttpStatus": 503,
+  "cacheReason": "refresh-failed",
+  "refreshFailure": {
+    "stage": "download",
+    "category": "download-or-runtime-failure"
+  }
+}
