@@ -7,7 +7,7 @@ test('default fetch preserves global receiver in receiver-sensitive runtimes',as
  t.after(()=>{globalThis.fetch=original;});
  globalThis.fetch=async function(url,options){
   assert.equal(this,globalThis,'global fetch receiver was lost');
-  assert.equal(new URL(url).origin,'https://simplicity.kiwi');assert.equal(options.redirect,'error');assert.ok(options.signal);calls++;
+  assert.equal(new URL(url).origin,'https://simplicity.kiwi');assert.equal(options.redirect,'manual');assert.ok(options.signal);calls++;
   return new Response('Date,Price\n04-11-2026,1.25',{headers:{'Content-Type':'text/csv'}});
  };
  const result=await fetchSimplicityHistory(fund,{now:()=>new Date('2026-11-08T10:00:00Z')});

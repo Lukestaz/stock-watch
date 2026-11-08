@@ -7,7 +7,7 @@ const fund = { seriesId: 'simplicity:kiwisaver:high-growth', verificationStatus:
 test('fetch timestamp never implies observation freshness', async () => {
   const result = await fetchSimplicityHistory(fund, {
     fetchImpl: async (url, options) => {
-      assert.equal(options.redirect, 'error');
+      assert.equal(options.redirect, 'manual');
       assert.ok(options.signal);
       return new Response('Date,Price\n02-11-2026,1.25', { headers: { 'content-type': 'text/csv' } });
     },

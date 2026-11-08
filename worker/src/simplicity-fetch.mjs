@@ -9,7 +9,7 @@ export async function fetchSimplicityHistory(fund, { fetchImpl = (input, init) =
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let reader;
   try {
-    const response = await fetchImpl(url.toString(), { signal: controller.signal, redirect: 'error', headers: { Accept: 'text/csv, text/plain;q=0.9' } });
+    const response = await fetchImpl(url.toString(), { signal: controller.signal, redirect: 'manual', headers: { Accept: 'text/csv, text/plain;q=0.9' } });
     if (!response.ok) throw new Error(`Feed HTTP ${response.status}`);
     const contentType = response.headers.get('content-type') ?? '';
     if (/html|json/i.test(contentType)) throw new Error('Unexpected response type');
