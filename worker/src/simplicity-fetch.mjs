@@ -1,6 +1,6 @@
 import { parseSimplicityHistory } from './simplicity-history.mjs';
 
-export async function fetchSimplicityHistory(fund, { fetchImpl = fetch, now = () => new Date(), timeoutMs = 10000 } = {}) {
+export async function fetchSimplicityHistory(fund, { fetchImpl = (input, init) => globalThis.fetch(input, init), now = () => new Date(), timeoutMs = 10000 } = {}) {
   if (fund?.verificationStatus !== 'verified' || !fund.feedUrl) throw new Error('Verified feed mapping required');
   const url = new URL(fund.feedUrl);
   if (url.origin !== 'https://simplicity.kiwi' || url.pathname !== '/api/download_prices' || url.username || url.password || url.hash || !url.searchParams.get('fund_name')) throw new Error('Invalid feed URL');

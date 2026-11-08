@@ -1,4 +1,4 @@
-name: Deploy targeted Simplicity refresh diagnostic hotfix
+name: Deploy Simplicity receiver-safe fetch fix
 on:
   push:
     branches: [feat/simplicity-preview-release]
@@ -6,6 +6,8 @@ on:
       - '.github/workflows/simplicity-refresh-hotfix.yml'
       - 'worker/src/simplicity-route.mjs'
       - 'worker/test/simplicity-refresh-failure.test.mjs'
+      - 'worker/src/simplicity-fetch.mjs'
+      - 'worker/test/simplicity-fetch-receiver.test.mjs'
 permissions:
   contents: read
 jobs:
@@ -31,7 +33,7 @@ jobs:
         run: |
           node --test worker/test/simplicity-*.test.mjs worker/test/account-*.test.mjs tests/legacy-pages.test.mjs
           node --check site/simplicity.js
-      - name: Deploy only the approved refresh diagnostic hotfix; no migrations
+      - name: Deploy approved receiver-safe fetch fix; no migrations
         uses: actions/github-script@v7
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -39,7 +41,7 @@ jobs:
         with:
           script: |
             const fs=require('node:fs'),path=require('node:path'),{execFileSync}=require('node:child_process'),{pathToFileURL}=require('node:url');
-            const APP='https://stock-watch-app.lukestaz.workers.dev',ACCOUNT='c4814713eafd41ae857b9a8097610df6',DB='4cb54afc-8f2d-4f62-8b6b-7d59f343b938',BEFORE='40986bd5e34c7e38bd349607446130699d9e8c25';
+            const APP='https://stock-watch-app.lukestaz.workers.dev',ACCOUNT='c4814713eafd41ae857b9a8097610df6',DB='4cb54afc-8f2d-4f62-8b6b-7d59f343b938',BEFORE='b8fd856a944f3332eaf5cf75261a1e157b24e661';
             const report={schemaVersion:1,sourceSha:process.env.GITHUB_SHA,sourceRef:process.env.GITHUB_REF,releaseSha:process.env.GITHUB_SHA,runId:process.env.GITHUB_RUN_ID,runNumber:process.env.GITHUB_RUN_NUMBER,runAttempt:process.env.GITHUB_RUN_ATTEMPT,worker:'stock-watch-app',databaseId:DB,stage:'preflight',outcome:'running',migrationRequested:false,deploymentAttempted:false,deploymentVerified:false,refreshRestored:false,automaticRollbackPerformed:false};
             const save=()=>{report.updatedAt=new Date().toISOString();fs.writeFileSync(process.env.REPORT_FILE,JSON.stringify(report,null,2)+'\n');};
             const assert=require('node:assert/strict');
