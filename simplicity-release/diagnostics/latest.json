@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 1,
+  "scope": "verification-only diagnostic probes",
+  "sourceSha": "eab5c0dadab3bf9de31805b9088ccc5efa26fe7a",
+  "sourceRef": "refs/heads/feat/simplicity-preview-release",
+  "runId": "42469696962",
+  "runNumber": "1",
+  "runAttempt": "1",
+  "expectedRelease": "40986bd5e34c7e38bd349607446130699d9e8c25",
+  "appUrl": "https://stock-watch-app.lukestaz.workers.dev",
+  "checks": [
+    {
+      "name": "health-http",
+      "status": "passed",
+      "httpStatus": 200,
+      "jsonParsed": true
+    },
+    {
+      "name": "expected-build",
+      "status": "passed",
+      "observedBuild": "40986bd5e34c7e38bd349607446130699d9e8c25"
+    },
+    {
+      "name": "account-health",
+      "status": "passed",
+      "ok": true,
+      "expectedMode": true
+    },
+    {
+      "name": "database-health",
+      "status": "passed",
+      "bound": true,
+      "ready": true
+    },
+    {
+      "name": "worker-settings-http",
+      "status": "passed",
+      "httpStatus": 200
+    },
+    {
+      "name": "settings-compatible-with-original-verifier",
+      "status": "passed"
+    },
+    {
+      "name": "simplicity-read-only-enabled",
+      "status": "passed"
+    },
+    {
+      "name": "worker-build-marker",
+      "status": "passed"
+    },
+    {
+      "name": "friends-flags-off",
+      "status": "passed"
+    },
+    {
+      "name": "asset-http:/",
+      "status": "passed",
+      "httpStatus": 200
+    },
+    {
+      "name": "asset-request:/simplicity.html",
+      "status": "error",
+      "category": "request-or-check-error"
+    },
+    {
+      "name": "asset-http:/simplicity.js",
+      "status": "passed",
+      "httpStatus": 200
+    },
+    {
+      "name": "asset-http:/simplicity-view.mjs",
+      "status": "passed",
+      "httpStatus": 200
+    },
+    {
+      "name": "fund-first-http",
+      "status": "failed",
+      "httpStatus": 503,
+      "jsonParsed": true,
+      "cacheState": "unavailable",
+      "cacheReason": "refresh-failed",
+      "errorCategory": "refresh-unavailable"
+    },
+    {
+      "name": "fund-first-payload",
+      "status": "failed"
+    },
+    {
+      "name": "fund-second-http",
+      "status": "failed",
+      "httpStatus": 503,
+      "jsonParsed": true,
+      "cacheState": "unavailable",
+      "cacheReason": "backoff",
+      "errorCategory": "refresh-unavailable"
+    },
+    {
+      "name": "fund-cache-reuse",
+      "status": "failed"
+    },
+    {
+      "name": "fund-origin-guard",
+      "status": "passed",
+      "httpStatus": 403
+    },
+    {
+      "name": "anonymous-account-guard",
+      "status": "passed",
+      "httpStatus": 401
+    },
+    {
+      "name": "disabled-alert-route:/api/v1/alert-destination/email",
+      "status": "passed",
+      "httpStatus": 404
+    },
+    {
+      "name": "disabled-alert-route:/api/v1/alert-destination/email/verify",
+      "status": "passed",
+      "httpStatus": 404
+    },
+    {
+      "name": "disabled-alert-route:/api/v1/alert-consent/email",
+      "status": "passed",
+      "httpStatus": 404
+    }
+  ],
+  "migrationRequested": false,
+  "deploymentRequested": false,
+  "configurationChangeRequested": false,
+  "originalSecretBaselineCompared": false,
+  "currentSecretBindingCount": 0,
+  "bindingTypeCounts": {
+    "d1": 1,
+    "service": 1,
+    "ratelimit": 1,
+    "assets": 1,
+    "plain_text": 8,
+    "secret_text": 0
+  },
+  "dashboardSimplicityLinkDetected": false,
+  "outcome": "failed",
+  "checkedAt": "2026-11-08T10:02:29.655Z"
+}
