@@ -4,6 +4,24 @@ import { createSimplicityStore } from './simplicity-store.mjs';
 const json = (body, status = 200) => Response.json(body, {
   status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }
 });
+export function classifyRefreshFailure(error, stage) {
+  const phase = ['download','validate','persist'].includes(stage) ? stage : 'unknown';
+  const failure = { stage: phase, category: 'unexpected-failure' };
+  if (phase === 'persist') failure.category = 'storage-failure';
+  else if (phase === 'validate') failure.category = error?.message === 'Future-dated feed' ? 'future-dated-feed' : 'snapshot-invalid';
+  else if (phase === 'download') {
+    const http = /^Feed HTTP ([1-5][0-9]{2})$/.exec(error?.message || '');
+    if (http) return { stage: phase, category: 'upstream-http', httpStatus: Number(http[1]) };
+    if (['AbortError','TimeoutError'].includes(error?.name)) failure.category = 'upstream-timeout';
+    else if (error?.message === 'Unexpected response type') failure.category = 'upstream-content-type';
+    else if (error?.message === 'Empty response body') failure.category = 'upstream-empty';
+    else if (error?.message === 'Feed exceeds size limit') failure.category = 'upstream-size-limit';
+    else if (['Verified feed mapping required','Invalid feed URL','Invalid timeout'].includes(error?.message)) failure.category = 'fetch-configuration';
+    else if (['Explicit supported series identity required','CSV text required','Unexpected CSV header','Invalid CSV row','Expected DD-MM-YYYY date','Invalid calendar date','Invalid price','Price must be positive and finite','Conflicting duplicate date','No price observations'].includes(error?.message)) failure.category = 'csv-invalid';
+    else failure.category = 'download-or-runtime-failure';
+  }
+  return failure;
+}
 const loadDefault = async fund => {
   const { fetchSimplicityHistory } = await import('./simplicity-fetch.mjs');
   return fetchSimplicityHistory({ ...fund, verificationStatus: 'verified' });
@@ -29,9 +47,9 @@ export function createSimplicityRoute({ load = loadDefault, snapshot = snapshotD
       history: row.history.map(item => ({ asOfDate: item.asOfDate, price: item.price }))
     };
   }
-  async function unavailable(row, seriesId, reason) {
+  async function unavailable(row, seriesId, reason, failure = null) {
     const previous = await value(row, seriesId);
-    return json({ error: 'Fund data temporarily unavailable', cache: { storage: 'd1', state: previous ? 'stale' : 'unavailable', reason, retryAt: row.state?.retry_at || null }, lastSuccessful: previous }, 503);
+    return json({ error: 'Fund data temporarily unavailable', cache: { storage: 'd1', state: previous ? 'stale' : 'unavailable', reason, retryAt: row.state?.retry_at || null, ...(failure ? { failure } : {}) }, lastSuccessful: previous }, 503);
   }
   return async function handle(request, env) {
     if (env.SIMPLICITY_READ_ONLY !== 'true') return json({ error: 'Not found' }, 404);
@@ -63,15 +81,18 @@ export function createSimplicityRoute({ load = loadDefault, snapshot = snapshotD
         const existing = row.state?.fresh_until > seconds() ? await value(row, fund.seriesId) : null;
         return existing ? json({ ...existing, cache: { storage: 'd1', state: 'cached' } }) : await unavailable(row, fund.seriesId, 'refresh-in-progress');
       }
-      let saved;
+      let saved, phase = 'download';
       try {
         const result = await load(fund);
+        phase = 'validate';
         const checked = await snapshot(result, { todayNZ: todayNZ() });
         if (checked.freshness === 'future-dated') throw Error('Future-dated feed');
+        phase = 'persist';
         saved = await store.save(fund.seriesId, owner, seconds(), result);
-      } catch {
+      } catch (error) {
+        const failure = classifyRefreshFailure(error, phase);
         await store.fail(fund.seriesId, owner, seconds());
-        return await unavailable(await store.read(fund.seriesId), fund.seriesId, 'refresh-failed');
+        return await unavailable(await store.read(fund.seriesId), fund.seriesId, 'refresh-failed', failure);
       }
       row = await store.read(fund.seriesId);
       const stored = row.state?.fresh_until > seconds() ? await value(row, fund.seriesId) : null;

@@ -1,0 +1,130 @@
+name: Deploy targeted Simplicity refresh diagnostic hotfix
+on:
+  push:
+    branches: [feat/simplicity-preview-release]
+    paths:
+      - '.github/workflows/simplicity-refresh-hotfix.yml'
+      - 'worker/src/simplicity-route.mjs'
+      - 'worker/test/simplicity-refresh-failure.test.mjs'
+permissions:
+  contents: read
+jobs:
+  hotfix:
+    if: github.repository == 'Lukestaz/stock-watch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: deploy-stock-watch-app
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require complete offline regression suites
+        run: |
+          node --test worker/test/simplicity-*.test.mjs worker/test/account-*.test.mjs tests/legacy-pages.test.mjs
+          node --check site/simplicity.js
+      - name: Deploy only the approved refresh diagnostic hotfix; no migrations
+        uses: actions/github-script@v7
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          REPORT_FILE: ${{ runner.temp }}/simplicity-refresh-hotfix.json
+        with:
+          script: |
+            const fs=require('node:fs'),path=require('node:path'),{execFileSync}=require('node:child_process'),{pathToFileURL}=require('node:url');
+            const APP='https://stock-watch-app.lukestaz.workers.dev',ACCOUNT='c4814713eafd41ae857b9a8097610df6',DB='4cb54afc-8f2d-4f62-8b6b-7d59f343b938',BEFORE='40986bd5e34c7e38bd349607446130699d9e8c25';
+            const report={schemaVersion:1,sourceSha:process.env.GITHUB_SHA,sourceRef:process.env.GITHUB_REF,releaseSha:process.env.GITHUB_SHA,runId:process.env.GITHUB_RUN_ID,runNumber:process.env.GITHUB_RUN_NUMBER,runAttempt:process.env.GITHUB_RUN_ATTEMPT,worker:'stock-watch-app',databaseId:DB,stage:'preflight',outcome:'running',migrationRequested:false,deploymentAttempted:false,deploymentVerified:false,refreshRestored:false,automaticRollbackPerformed:false};
+            const save=()=>{report.updatedAt=new Date().toISOString();fs.writeFileSync(process.env.REPORT_FILE,JSON.stringify(report,null,2)+'\n');};
+            const assert=require('node:assert/strict');
+            async function read(url,headers={},redirect='error'){
+             const r=await fetch(url,{method:'GET',headers,redirect,signal:AbortSignal.timeout(25000)});
+             const reader=r.body?.getReader(),decoder=new TextDecoder('utf-8',{fatal:true});let text='',bytes=0;
+             if(reader)try{while(true){const item=await reader.read();if(item.done)break;bytes+=item.value.byteLength;if(bytes>2000000)throw Error('Response limit');text+=decoder.decode(item.value,{stream:true});}text+=decoder.decode();}finally{try{await reader.cancel();}catch{}reader.releaseLock();}
+             let json=null;try{json=JSON.parse(text);}catch{}
+             return {status:r.status,text,json,location:r.headers.get('location')};
+            }
+            const local=(route,headers={},redirect='error')=>read(APP+route,headers,redirect);
+            const api=async suffix=>{assert.ok(process.env.CLOUDFLARE_API_TOKEN);const r=await read(`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/workers/scripts/stock-watch-app/${suffix}`,{Authorization:`Bearer ${process.env.CLOUDFLARE_API_TOKEN}`});assert.equal(r.status,200);assert.equal(r.json?.success,true);return r.json.result;};
+            try{
+             assert.match(process.env.GITHUB_SHA,/^[a-f0-9]{40}$/);
+             const h=await local('/api/health');assert.equal(h.status,200);assert.equal(h.json?.build,BEFORE);assert.equal(h.json?.ok,true);assert.equal(h.json?.database?.ready,true);assert.equal(h.json?.mode,'account-preview');report.previousBuild=h.json.build;save();
+             const settings=await api('settings'),{configuration}=await import(pathToFileURL(path.resolve('scripts/simplicity-production.mjs')).href),config=configuration(settings);
+             assert.equal(settings.bindings.find(b=>b.name==='SIMPLICITY_READ_ONLY')?.text,'true');
+             const schedules=await api('schedules');assert.equal((Array.isArray(schedules)?schedules:schedules.schedules)?.length,0);
+             const deployments=await api('deployments'),list=Array.isArray(deployments)?deployments:deployments.deployments;
+             assert.ok(Array.isArray(list)&&list.length);const previous=[...list].sort((a,b)=>String(b.created_on).localeCompare(String(a.created_on)))[0];assert.equal(previous.versions?.length,1);assert.equal(previous.versions[0].percentage,100);report.previousDeploymentId=previous.id;report.previousVersionId=previous.versions[0].version_id;
+             const secrets=settings.bindings.filter(b=>b.type==='secret_text').map(b=>b.name).sort();
+             const work=path.join(process.env.RUNNER_TEMP,'simplicity-refresh-hotfix');fs.mkdirSync(work);fs.cpSync('worker/src',path.join(work,'src'),{recursive:true});fs.cpSync('site',path.join(work,'static'),{recursive:true});
+             const market=path.join(work,'static/market-data.js'),old='https://stock-watch-prices.lukestaz.workers.dev',text=fs.readFileSync(market,'utf8');assert.ok(text.includes(old));fs.writeFileSync(market,text.split(old).join('/api'));
+             config.vars.BUILD_SHA=process.env.GITHUB_SHA;delete config.d1_databases[0].migrations_dir;const cfg=path.join(work,'wrangler.jsonc');fs.writeFileSync(cfg,JSON.stringify(config,null,2)+'\n',{mode:0o600});
+             report.stage='deploy';report.deploymentAttempted=true;save();
+             execFileSync('npx',['--yes','wrangler@4.150.0','deploy','--config',cfg],{cwd:work,encoding:'utf8',timeout:300000,maxBuffer:8388608,stdio:['ignore','pipe','pipe'],env:{...process.env,CLOUDFLARE_ACCOUNT_ID:ACCOUNT,CI:'true',WRANGLER_SEND_METRICS:'false'}});
+             report.stage='verify';save();let healthy=false;
+             for(let i=0;i<6;i++){try{const r=await local('/api/health');healthy=r.status===200&&r.json?.build===process.env.GITHUB_SHA&&r.json?.ok===true&&r.json?.database?.ready===true&&r.json?.mode==='account-preview';if(healthy)break;}catch{}if(i<5)await new Promise(r=>setTimeout(r,5000));}
+             assert.equal(healthy,true);report.deploymentVerified=true;save();
+             const after=await api('settings');configuration(after);assert.equal(after.bindings.find(b=>b.name==='BUILD_SHA')?.text,process.env.GITHUB_SHA);assert.deepEqual(after.bindings.filter(b=>b.type==='secret_text').map(b=>b.name).sort(),secrets);report.secretBindingNamesPreserved=true;
+             let page=await local('/simplicity.html',{},'manual');report.pageInitialStatus=page.status;
+             if([301,302,307,308].includes(page.status)){const target=new URL(page.location,APP);assert.equal(target.origin,APP);assert.ok(['/simplicity','/simplicity/'].includes(target.pathname));assert.equal(target.search,'');assert.equal(target.hash,'');report.pageCanonicalPath=target.pathname;page=await local(target.pathname);}
+             report.pageVerified=page.status===200&&page.text.includes('id="fund"')&&page.text.includes('id="range"');
+             const {validateFundView}=await import(pathToFileURL(path.resolve('site/simplicity-view.mjs')).href);
+             const series='simplicity:kiwisaver:high-growth',headers={Origin:APP,'Sec-Fetch-Site':'same-origin'},route='/api/v1/fund?series='+encodeURIComponent(series);
+             const first=await local(route,headers);report.fundHttpStatus=first.status;
+             report.cacheReason=['refresh-failed','backoff','refresh-in-progress','lease-lost'].includes(first.json?.cache?.reason)?first.json.cache.reason:null;
+             const failure=first.json?.cache?.failure;
+             if(failure&&['download','validate','persist','unknown'].includes(failure.stage)&&['upstream-http','upstream-timeout','upstream-content-type','upstream-empty','upstream-size-limit','fetch-configuration','csv-invalid','download-or-runtime-failure','future-dated-feed','snapshot-invalid','storage-failure','unexpected-failure'].includes(failure.category))report.refreshFailure={stage:failure.stage,category:failure.category,...(Number.isInteger(failure.httpStatus)&&failure.httpStatus>=100&&failure.httpStatus<=599?{httpStatus:failure.httpStatus}:{})};
+             if(first.status===200){validateFundView(first.json,series);assert.equal(first.json.snapshot.identityVerified,false);assert.equal(first.json.snapshot.alertEligible,false);const second=await local(route,headers);report.secondFundHttpStatus=second.status;assert.equal(second.status,200);validateFundView(second.json,series);report.cacheReused=second.json.cache?.state==='cached'&&second.json.snapshot.fetchedAt===first.json.snapshot.fetchedAt;report.refreshRestored=report.cacheReused;}
+             report.outcome=report.pageVerified&&report.refreshRestored?'passed':'failed';report.stage='complete';
+            }catch{report.outcome='failed';report.failedStage=report.stage;}
+            finally{save();}
+            if(report.outcome!=='passed')core.setFailed('Hotfix verification incomplete; inspect the redacted refresh stage/category');
+      - name: Preserve truthful hotfix and refresh outcome
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: simplicity-refresh-hotfix-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/simplicity-refresh-hotfix.json
+          retention-days: 30
+          if-no-files-found: warn
+  publish:
+    needs: hotfix
+    if: >-
+      always() && !cancelled() && github.repository == 'Lukestaz/stock-watch' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/feat/simplicity-preview-release'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    concurrency:
+      group: simplicity-refresh-hotfix-publisher
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: simplicity-refresh-hotfix-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/simplicity-refresh-hotfix
+      - uses: actions/github-script@v7
+        env:
+          REPORT_FILE: ${{ runner.temp }}/simplicity-refresh-hotfix/simplicity-refresh-hotfix.json
+        with:
+          script: |
+            const text=require('node:fs').readFileSync(process.env.REPORT_FILE,'utf8'),r=JSON.parse(text);
+            if(r.sourceSha!==process.env.GITHUB_SHA||r.runId!==process.env.GITHUB_RUN_ID||r.runAttempt!==process.env.GITHUB_RUN_ATTEMPT||!/^\d+$/.test(r.runId)||!/^\d+$/.test(r.runAttempt)||r.migrationRequested!==false||r.worker!=='stock-watch-app'||r.databaseId!=='4cb54afc-8f2d-4f62-8b6b-7d59f343b938')throw Error('Hotfix report mismatch');
+            const {owner,repo}=context.repo;
+            const read=async(path,ref)=>{try{const f=(await github.rest.repos.getContent({owner,repo,path,ref})).data;return JSON.parse(Buffer.from(f.content,'base64').toString('utf8'));}catch(e){if(e.status===404)return null;throw e;}};
+            const newer=(a,b)=>Number(a.runNumber)>Number(b.runNumber)||(Number(a.runNumber)===Number(b.runNumber)&&Number(a.runAttempt)>Number(b.runAttempt));
+            for(let n=0;n<4;n++){
+              const head=(await github.rest.git.getRef({owner,repo,ref:'heads/ci-results'})).data.object.sha,runPath=`simplicity-release/hotfix/runs/${r.runId}-${r.runAttempt}.json`;
+              if(await read(runPath,head))return;
+              const base=(await github.rest.git.getCommit({owner,repo,commit_sha:head})).data.tree.sha,entry=path=>({path,mode:'100644',type:'blob',content:text}),entries=[entry(runPath)],old=await read('simplicity-release/hotfix/latest.json',head);
+              if(!old||newer(r,old))entries.push(entry('simplicity-release/hotfix/latest.json'));
+              const tree=(await github.rest.git.createTree({owner,repo,base_tree:base,tree:entries})).data,commit=(await github.rest.git.createCommit({owner,repo,message:`Simplicity refresh hotfix ${r.runId}/${r.runAttempt}: ${r.outcome}`,tree:tree.sha,parents:[head]})).data;
+              try{await github.rest.git.updateRef({owner,repo,ref:'heads/ci-results',sha:commit.sha,force:false});return;}catch(e){if(![409,422].includes(e.status)||n===3)throw e;}
+            }
