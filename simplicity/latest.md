@@ -1,8 +1,8 @@
 # Simplicity verification outcome
 
 Result: passed
-Source: refs/heads/feat/simplicity-fund-monitor @ 05098bcfab54674a8138028990adc3059f2dac64
-Run: https://github.com/Lukestaz/stock-watch/actions/runs/42467401239 (attempt 1)
+Source: refs/heads/main @ 40986bd5e34c7e38bd349607446130699d9e8c25
+Run: https://github.com/Lukestaz/stock-watch/actions/runs/42467661804 (attempt 1)
 
 - simplicity: passed (65/65 passed)
 - accounts: passed (95/95 passed)
