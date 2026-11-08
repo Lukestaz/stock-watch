@@ -1,0 +1,99 @@
+name: Release Simplicity to production
+on:
+  push:
+    branches: [feat/simplicity-preview-release]
+    paths:
+      - '.github/workflows/simplicity-production.yml'
+      - 'scripts/simplicity-production.mjs'
+      - 'worker/test/simplicity-production.test.mjs'
+permissions:
+  contents: read
+jobs:
+  release:
+    if: github.repository == 'Lukestaz/stock-watch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: deploy-stock-watch-app
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: release-tools
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 40986bd5e34c7e38bd349607446130699d9e8c25
+          path: application
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test production configuration guards without provider access
+        run: node --test release-tools/worker/test/simplicity-production.test.mjs
+      - name: Test exact application release before remote changes
+        working-directory: application
+        run: |
+          test "$(git rev-parse HEAD)" = '40986bd5e34c7e38bd349607446130699d9e8c25'
+          node --test worker/test/simplicity-*.test.mjs worker/test/account-*.test.mjs tests/legacy-pages.test.mjs
+          node --check site/simplicity.js
+          node --check site/account-signin.js
+      - name: Preflight, migrate only Simplicity, deploy pinned app and verify
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          RELEASE_DIR: ${{ github.workspace }}/application
+          RELEASE_WORK: ${{ runner.temp }}/simplicity-production
+          OUTCOME_FILE: ${{ runner.temp }}/simplicity-production-report.json
+        run: node release-tools/scripts/simplicity-production.mjs
+      - name: Preserve redacted release outcome including partial failures
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: simplicity-production-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/simplicity-production-report.json
+          retention-days: 30
+          if-no-files-found: warn
+  publish:
+    needs: release
+    if: >-
+      always() && !cancelled() && github.repository == 'Lukestaz/stock-watch' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/feat/simplicity-preview-release'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    concurrency:
+      group: simplicity-production-report-publisher
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: simplicity-production-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/simplicity-production-report
+      - uses: actions/github-script@v7
+        env:
+          REPORT_FILE: ${{ runner.temp }}/simplicity-production-report/simplicity-production-report.json
+        with:
+          script: |
+            const text=require('node:fs').readFileSync(process.env.REPORT_FILE,'utf8'), report=JSON.parse(text);
+            if(report.sourceSha!==process.env.GITHUB_SHA || report.runId!==process.env.GITHUB_RUN_ID || report.runAttempt!==process.env.GITHUB_RUN_ATTEMPT || !/^\d+$/.test(report.runId) || !/^\d+$/.test(report.runAttempt) || report.releaseSha!=='40986bd5e34c7e38bd349607446130699d9e8c25' || report.worker!=='stock-watch-app' || report.databaseId!=='4cb54afc-8f2d-4f62-8b6b-7d59f343b938') throw Error('Release report metadata mismatch');
+            const {owner,repo}=context.repo;
+            const read=async(path,ref)=>{try{const f=(await github.rest.repos.getContent({owner,repo,path,ref})).data;return JSON.parse(Buffer.from(f.content,'base64').toString('utf8'));}catch(e){if(e.status===404)return null;throw e;}};
+            const newer=(a,b)=>Number(a.runNumber)>Number(b.runNumber)||(Number(a.runNumber)===Number(b.runNumber)&&Number(a.runAttempt)>Number(b.runAttempt));
+            for(let attempt=0;attempt<4;attempt++){
+              const head=(await github.rest.git.getRef({owner,repo,ref:'heads/ci-results'})).data.object.sha;
+              const runPath=`simplicity-release/production/runs/${report.runId}-${report.runAttempt}.json`;
+              if(await read(runPath,head))return;
+              const base=(await github.rest.git.getCommit({owner,repo,commit_sha:head})).data.tree.sha;
+              const entry=path=>({path,mode:'100644',type:'blob',content:text}), entries=[entry(runPath)];
+              const old=await read('simplicity-release/production/latest.json',head);
+              if(!old||newer(report,old))entries.push(entry('simplicity-release/production/latest.json'));
+              const tree=(await github.rest.git.createTree({owner,repo,base_tree:base,tree:entries})).data;
+              const commit=(await github.rest.git.createCommit({owner,repo,message:`Simplicity production ${report.runId}/${report.runAttempt}: ${report.outcome}`,tree:tree.sha,parents:[head]})).data;
+              try{await github.rest.git.updateRef({owner,repo,ref:'heads/ci-results',sha:commit.sha,force:false});core.info(`Saved redacted release result at ${commit.sha}`);return;}catch(e){if(![409,422].includes(e.status)||attempt===3)throw e;}
+            }
