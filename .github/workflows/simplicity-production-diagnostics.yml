@@ -1,0 +1,140 @@
+name: Diagnose Simplicity production without redeploying
+on:
+  push:
+    branches: [feat/simplicity-preview-release]
+    paths: ['.github/workflows/simplicity-production-diagnostics.yml']
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    if: github.repository == 'Lukestaz/stock-watch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check diagnostic dependency guards without credentials
+        run: node --test worker/test/simplicity-production.test.mjs
+      - name: Record named HTTP and settings checks only
+        uses: actions/github-script@v7
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          REPORT_FILE: ${{ runner.temp }}/simplicity-production-diagnostics.json
+        with:
+          script: |
+            const fs=require('node:fs'),path=require('node:path'),{pathToFileURL}=require('node:url');
+            const APP='https://stock-watch-app.lukestaz.workers.dev',EXPECTED='40986bd5e34c7e38bd349607446130699d9e8c25';
+            const {configuration}=await import(pathToFileURL(path.resolve('scripts/simplicity-production.mjs')).href);
+            const {validateFundView}=await import(pathToFileURL(path.resolve('site/simplicity-view.mjs')).href);
+            const report={schemaVersion:1,scope:'verification-only diagnostic probes',sourceSha:process.env.GITHUB_SHA,sourceRef:process.env.GITHUB_REF,runId:process.env.GITHUB_RUN_ID,runNumber:process.env.GITHUB_RUN_NUMBER,runAttempt:process.env.GITHUB_RUN_ATTEMPT,expectedRelease:EXPECTED,appUrl:APP,checks:[],migrationRequested:false,deploymentRequested:false,configurationChangeRequested:false,originalSecretBaselineCompared:false};
+            const add=(name,passed,details={})=>report.checks.push({name,status:passed?'passed':'failed',...details});
+            const attempt=async(name,fn)=>{try{await fn();}catch{report.checks.push({name,status:'error',category:'request-or-check-error'});}};
+            async function read(url,headers={}){
+             const r=await fetch(url,{method:'GET',headers,redirect:'error',signal:AbortSignal.timeout(25000)});
+             if(!r.body)return {status:r.status,text:'',json:null};
+             const reader=r.body.getReader(),decoder=new TextDecoder('utf-8',{fatal:true});let text='',bytes=0;
+             try{while(true){const part=await reader.read();if(part.done)break;bytes+=part.value.byteLength;if(bytes>2000000)throw Error('Response limit');text+=decoder.decode(part.value,{stream:true});}text+=decoder.decode();}
+             finally{try{await reader.cancel();}catch{}reader.releaseLock();}
+             let json=null;try{json=JSON.parse(text);}catch{}
+             return {status:r.status,text,json};
+            }
+            const local=(route,headers={})=>read(APP+route,headers);
+            const sameOrigin={Origin:APP,'Sec-Fetch-Site':'same-origin'};
+            await attempt('health-request',async()=>{
+             const r=await local('/api/health'),h=r.json;
+             add('health-http',r.status===200,{httpStatus:r.status,jsonParsed:!!h});
+             add('expected-build',h?.build===EXPECTED,{observedBuild:/^[a-f0-9]{40}$/.test(h?.build||'')?h.build:null});
+             add('account-health',h?.ok===true&&h?.mode==='account-preview',{ok:h?.ok===true,expectedMode:h?.mode==='account-preview'});
+             add('database-health',h?.database?.bound===true&&h?.database?.ready===true,{bound:h?.database?.bound===true,ready:h?.database?.ready===true});
+            });
+            await attempt('worker-settings-request',async()=>{
+             if(!process.env.CLOUDFLARE_API_TOKEN)throw Error('Missing token');
+             const r=await read('https://api.cloudflare.com/client/v4/accounts/c4814713eafd41ae857b9a8097610df6/workers/scripts/stock-watch-app/settings',{Authorization:`Bearer ${process.env.CLOUDFLARE_API_TOKEN}`});
+             add('worker-settings-http',r.status===200&&r.json?.success===true,{httpStatus:r.status});
+             const s=r.json?.result;if(!Array.isArray(s?.bindings))throw Error('Settings unavailable');
+             let compatible=false;try{configuration(s);compatible=true;}catch{}
+             add('settings-compatible-with-original-verifier',compatible);
+             const flag=name=>s.bindings.find(b=>b.name===name&&b.type==='plain_text')?.text;
+             add('simplicity-read-only-enabled',flag('SIMPLICITY_READ_ONLY')==='true');
+             add('worker-build-marker',flag('BUILD_SHA')===EXPECTED);
+             add('friends-flags-off',['FRIENDS_ALERTS_ENABLED','FRIENDS_ENROLLMENT_ENABLED','FRIENDS_SCHEDULE_ENABLED'].every(name=>flag(name)===undefined||flag(name)==='false'));
+             report.currentSecretBindingCount=s.bindings.filter(b=>b.type==='secret_text').length;
+             report.bindingTypeCounts=Object.fromEntries(['d1','service','ratelimit','assets','plain_text','secret_text'].map(type=>[type,s.bindings.filter(b=>b.type===type).length]));
+            });
+            for(const route of ['/','/simplicity.html','/simplicity.js','/simplicity-view.mjs'])await attempt('asset-request:'+route,async()=>{
+             const r=await local(route);add('asset-http:'+route,r.status===200,{httpStatus:r.status});
+             if(route==='/simplicity.html')add('simplicity-page-markup',r.text.includes('id="fund"')&&r.text.includes('id="range"')&&r.text.includes('Simplicity funds'));
+             if(route==='/')report.dashboardSimplicityLinkDetected=/href=["'][^"']*simplicity\.html/.test(r.text);
+            });
+            const id='simplicity:kiwisaver:high-growth',route='/api/v1/fund?series='+encodeURIComponent(id);let first=null;
+            const safeFundDetails=r=>({httpStatus:r.status,jsonParsed:!!r.json,cacheState:['cached','refreshed','stale','unavailable'].includes(r.json?.cache?.state)?r.json.cache.state:null,cacheReason:['backoff','refresh-in-progress','refresh-failed','lease-lost'].includes(r.json?.cache?.reason)?r.json.cache.reason:null,errorCategory:({'Fund database unavailable':'database-unavailable','Fund data temporarily unavailable':'refresh-unavailable','Fund rate limiter unavailable':'rate-limiter-unavailable','Not found':'feature-disabled','Too many requests':'rate-limited','Origin not allowed':'origin-rejected'})[r.json?.error]||null});
+            await attempt('first-fund-request',async()=>{
+             const r=await local(route,sameOrigin);add('fund-first-http',r.status===200,safeFundDetails(r));
+             let valid=false;try{validateFundView(r.json,id);valid=true;}catch{}
+             add('fund-first-payload',valid);
+             if(valid){first=r.json;add('fund-unverified-and-alerts-disabled',first.snapshot.identityVerified===false&&first.snapshot.alertEligible===false);report.fundObservationDate=first.snapshot.asOfDate;}
+            });
+            await attempt('second-fund-request',async()=>{
+             const r=await local(route,sameOrigin);add('fund-second-http',r.status===200,safeFundDetails(r));
+             let valid=false;try{validateFundView(r.json,id);valid=true;}catch{}
+             add('fund-cache-reuse',valid&&!!first&&r.json.cache?.state==='cached'&&r.json.snapshot.fetchedAt===first.snapshot.fetchedAt);
+            });
+            await attempt('fund-origin-guard',async()=>{const r=await local(route,{Origin:'https://example.invalid','Sec-Fetch-Site':'cross-site'});add('fund-origin-guard',r.status===403,{httpStatus:r.status});});
+            await attempt('anonymous-account-guard',async()=>{const r=await local('/api/v1/watchlist',sameOrigin);add('anonymous-account-guard',r.status===401,{httpStatus:r.status});});
+            for(const route of ['/api/v1/alert-destination/email','/api/v1/alert-destination/email/verify','/api/v1/alert-consent/email'])await attempt('disabled-alert-route:'+route,async()=>{const r=await local(route,sameOrigin);add('disabled-alert-route:'+route,[404,503].includes(r.status),{httpStatus:r.status});});
+            report.outcome=report.checks.some(c=>c.status!=='passed')?'failed':'passed';
+            report.checkedAt=new Date().toISOString();
+            fs.writeFileSync(process.env.REPORT_FILE,JSON.stringify(report,null,2)+'\n');
+            if(report.outcome!=='passed')core.setFailed('One or more named diagnostic checks failed; see redacted report');
+      - name: Retain redacted diagnostics on failed checks too
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: simplicity-production-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/simplicity-production-diagnostics.json
+          retention-days: 7
+          if-no-files-found: warn
+  publish:
+    needs: diagnose
+    if: >-
+      always() && !cancelled() && github.repository == 'Lukestaz/stock-watch' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/feat/simplicity-preview-release'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    concurrency:
+      group: simplicity-production-diagnostics-publisher
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: simplicity-production-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/simplicity-diagnostics
+      - uses: actions/github-script@v7
+        env:
+          REPORT_FILE: ${{ runner.temp }}/simplicity-diagnostics/simplicity-production-diagnostics.json
+        with:
+          script: |
+            const text=require('node:fs').readFileSync(process.env.REPORT_FILE,'utf8'),report=JSON.parse(text);
+            if(report.sourceSha!==process.env.GITHUB_SHA||report.runId!==process.env.GITHUB_RUN_ID||report.runAttempt!==process.env.GITHUB_RUN_ATTEMPT||!/^\d+$/.test(report.runId)||!/^\d+$/.test(report.runAttempt)||report.migrationRequested!==false||report.deploymentRequested!==false||report.configurationChangeRequested!==false)throw Error('Diagnostic report mismatch');
+            const {owner,repo}=context.repo;
+            const read=async(path,ref)=>{try{const f=(await github.rest.repos.getContent({owner,repo,path,ref})).data;return JSON.parse(Buffer.from(f.content,'base64').toString('utf8'));}catch(e){if(e.status===404)return null;throw e;}};
+            const newer=(a,b)=>Number(a.runNumber)>Number(b.runNumber)||(Number(a.runNumber)===Number(b.runNumber)&&Number(a.runAttempt)>Number(b.runAttempt));
+            for(let attempt=0;attempt<4;attempt++){
+              const head=(await github.rest.git.getRef({owner,repo,ref:'heads/ci-results'})).data.object.sha;
+              const runPath=`simplicity-release/diagnostics/runs/${report.runId}-${report.runAttempt}.json`;
+              if(await read(runPath,head))return;
+              const base=(await github.rest.git.getCommit({owner,repo,commit_sha:head})).data.tree.sha;
+              const entry=path=>({path,mode:'100644',type:'blob',content:text}),entries=[entry(runPath)];
+              const old=await read('simplicity-release/diagnostics/latest.json',head);
+              if(!old||newer(report,old))entries.push(entry('simplicity-release/diagnostics/latest.json'));
+              const tree=(await github.rest.git.createTree({owner,repo,base_tree:base,tree:entries})).data;
+              const commit=(await github.rest.git.createCommit({owner,repo,message:`Simplicity diagnostic ${report.runId}/${report.runAttempt}: ${report.outcome}`,tree:tree.sha,parents:[head]})).data;
+              try{await github.rest.git.updateRef({owner,repo,ref:'heads/ci-results',sha:commit.sha,force:false});return;}catch(e){if(![409,422].includes(e.status)||attempt===3)throw e;}
+            }
