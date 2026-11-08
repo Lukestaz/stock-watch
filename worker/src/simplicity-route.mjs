@@ -1,5 +1,6 @@
 import { DOWNLOAD_EVIDENCE } from './simplicity-feed-health.mjs';
 import { createSimplicityStore } from './simplicity-store.mjs';
+import { captureRefreshException } from './simplicity-exception-log.mjs';
 
 const json = (body, status = 200) => Response.json(body, {
   status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }
@@ -90,7 +91,8 @@ export function createSimplicityRoute({ load = loadDefault, snapshot = snapshotD
         phase = 'persist';
         saved = await store.save(fund.seriesId, owner, seconds(), result);
       } catch (error) {
-        const failure = classifyRefreshFailure(error, phase);
+        const errorId = captureRefreshException(error, { stage: phase, seriesId: fund.seriesId, build: env.BUILD_SHA });
+        const failure = { ...classifyRefreshFailure(error, phase), ...(errorId ? { errorId } : {}) };
         await store.fail(fund.seriesId, owner, seconds());
         return await unavailable(await store.read(fund.seriesId), fund.seriesId, 'refresh-failed', failure);
       }

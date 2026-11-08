@@ -1,4 +1,4 @@
-name: Deploy Simplicity receiver-safe fetch fix
+name: Deploy Simplicity private exception logging
 on:
   push:
     branches: [feat/simplicity-preview-release]
@@ -8,6 +8,8 @@ on:
       - 'worker/test/simplicity-refresh-failure.test.mjs'
       - 'worker/src/simplicity-fetch.mjs'
       - 'worker/test/simplicity-fetch-receiver.test.mjs'
+      - 'worker/src/simplicity-exception-log.mjs'
+      - 'worker/test/simplicity-exception-log.test.mjs'
 permissions:
   contents: read
 jobs:
@@ -33,7 +35,7 @@ jobs:
         run: |
           node --test worker/test/simplicity-*.test.mjs worker/test/account-*.test.mjs tests/legacy-pages.test.mjs
           node --check site/simplicity.js
-      - name: Deploy approved receiver-safe fetch fix; no migrations
+      - name: Deploy approved private exception logging; no migrations
         uses: actions/github-script@v7
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -41,7 +43,7 @@ jobs:
         with:
           script: |
             const fs=require('node:fs'),path=require('node:path'),{execFileSync}=require('node:child_process'),{pathToFileURL}=require('node:url');
-            const APP='https://stock-watch-app.lukestaz.workers.dev',ACCOUNT='c4814713eafd41ae857b9a8097610df6',DB='4cb54afc-8f2d-4f62-8b6b-7d59f343b938',BEFORE='b8fd856a944f3332eaf5cf75261a1e157b24e661';
+            const APP='https://stock-watch-app.lukestaz.workers.dev',ACCOUNT='c4814713eafd41ae857b9a8097610df6',DB='4cb54afc-8f2d-4f62-8b6b-7d59f343b938',BEFORE='f6b12e008346ef6d45280d55af25a5b5c764ed77';
             const report={schemaVersion:1,sourceSha:process.env.GITHUB_SHA,sourceRef:process.env.GITHUB_REF,releaseSha:process.env.GITHUB_SHA,runId:process.env.GITHUB_RUN_ID,runNumber:process.env.GITHUB_RUN_NUMBER,runAttempt:process.env.GITHUB_RUN_ATTEMPT,worker:'stock-watch-app',databaseId:DB,stage:'preflight',outcome:'running',migrationRequested:false,deploymentAttempted:false,deploymentVerified:false,refreshRestored:false,automaticRollbackPerformed:false};
             const save=()=>{report.updatedAt=new Date().toISOString();fs.writeFileSync(process.env.REPORT_FILE,JSON.stringify(report,null,2)+'\n');};
             const assert=require('node:assert/strict');
@@ -59,34 +61,40 @@ jobs:
              const h=await local('/api/health');assert.equal(h.status,200);assert.equal(h.json?.build,BEFORE);assert.equal(h.json?.ok,true);assert.equal(h.json?.database?.ready,true);assert.equal(h.json?.mode,'account-preview');report.previousBuild=h.json.build;save();
              const settings=await api('settings'),{configuration}=await import(pathToFileURL(path.resolve('scripts/simplicity-production.mjs')).href),config=configuration(settings);
              assert.equal(settings.bindings.find(b=>b.name==='SIMPLICITY_READ_ONLY')?.text,'true');
+             assert.equal(settings.observability?.logs?.destinations?.length||0,0);
              const schedules=await api('schedules');assert.equal((Array.isArray(schedules)?schedules:schedules.schedules)?.length,0);
              const deployments=await api('deployments'),list=Array.isArray(deployments)?deployments:deployments.deployments;
              assert.ok(Array.isArray(list)&&list.length);const previous=[...list].sort((a,b)=>String(b.created_on).localeCompare(String(a.created_on)))[0];assert.equal(previous.versions?.length,1);assert.equal(previous.versions[0].percentage,100);report.previousDeploymentId=previous.id;report.previousVersionId=previous.versions[0].version_id;
              const secrets=settings.bindings.filter(b=>b.type==='secret_text').map(b=>b.name).sort();
              const work=path.join(process.env.RUNNER_TEMP,'simplicity-refresh-hotfix');fs.mkdirSync(work);fs.cpSync('worker/src',path.join(work,'src'),{recursive:true});fs.cpSync('site',path.join(work,'static'),{recursive:true});
              const market=path.join(work,'static/market-data.js'),old='https://stock-watch-prices.lukestaz.workers.dev',text=fs.readFileSync(market,'utf8');assert.ok(text.includes(old));fs.writeFileSync(market,text.split(old).join('/api'));
-             config.vars.BUILD_SHA=process.env.GITHUB_SHA;delete config.d1_databases[0].migrations_dir;const cfg=path.join(work,'wrangler.jsonc');fs.writeFileSync(cfg,JSON.stringify(config,null,2)+'\n',{mode:0o600});
+             config.vars.BUILD_SHA=process.env.GITHUB_SHA;delete config.d1_databases[0].migrations_dir;
+             config.observability={enabled:true,head_sampling_rate:1,logs:{enabled:true,invocation_logs:false,persist:true}};
+             const cfg=path.join(work,'wrangler.jsonc');fs.writeFileSync(cfg,JSON.stringify(config,null,2)+'\n',{mode:0o600});
              report.stage='deploy';report.deploymentAttempted=true;save();
              execFileSync('npx',['--yes','wrangler@4.150.0','deploy','--config',cfg],{cwd:work,encoding:'utf8',timeout:300000,maxBuffer:8388608,stdio:['ignore','pipe','pipe'],env:{...process.env,CLOUDFLARE_ACCOUNT_ID:ACCOUNT,CI:'true',WRANGLER_SEND_METRICS:'false'}});
              report.stage='verify';save();let healthy=false;
              for(let i=0;i<6;i++){try{const r=await local('/api/health');healthy=r.status===200&&r.json?.build===process.env.GITHUB_SHA&&r.json?.ok===true&&r.json?.database?.ready===true&&r.json?.mode==='account-preview';if(healthy)break;}catch{}if(i<5)await new Promise(r=>setTimeout(r,5000));}
              assert.equal(healthy,true);report.deploymentVerified=true;save();
              const after=await api('settings');configuration(after);assert.equal(after.bindings.find(b=>b.name==='BUILD_SHA')?.text,process.env.GITHUB_SHA);assert.deepEqual(after.bindings.filter(b=>b.type==='secret_text').map(b=>b.name).sort(),secrets);report.secretBindingNamesPreserved=true;
+             report.privateLoggingConfigured=after.observability?.enabled===true&&after.observability?.logs?.enabled===true&&after.observability?.logs?.invocation_logs===false&&after.observability?.logs?.persist!==false;assert.equal(report.privateLoggingConfigured,true);save();
              let page=await local('/simplicity.html',{},'manual');report.pageInitialStatus=page.status;
              if([301,302,307,308].includes(page.status)){const target=new URL(page.location,APP);assert.equal(target.origin,APP);assert.ok(['/simplicity','/simplicity/'].includes(target.pathname));assert.equal(target.search,'');assert.equal(target.hash,'');report.pageCanonicalPath=target.pathname;page=await local(target.pathname);}
              report.pageVerified=page.status===200&&page.text.includes('id="fund"')&&page.text.includes('id="range"');
              const {validateFundView}=await import(pathToFileURL(path.resolve('site/simplicity-view.mjs')).href);
              const series='simplicity:kiwisaver:high-growth',headers={Origin:APP,'Sec-Fetch-Site':'same-origin'},route='/api/v1/fund?series='+encodeURIComponent(series);
-             const first=await local(route,headers);report.fundHttpStatus=first.status;
-             report.cacheReason=['refresh-failed','backoff','refresh-in-progress','lease-lost'].includes(first.json?.cache?.reason)?first.json.cache.reason:null;
+             let first=await local(route,headers);
+             if(first.status===503&&first.json?.cache?.reason==='backoff'&&Number.isSafeInteger(first.json?.cache?.retryAt)){report.backoffWaitSeconds=Math.min(65,Math.max(0,first.json.cache.retryAt-Math.floor(Date.now()/1000))+1);await new Promise(r=>setTimeout(r,report.backoffWaitSeconds*1000));first=await local(route,headers);}
+             report.fundHttpStatus=first.status;report.cacheReason=['refresh-failed','backoff','refresh-in-progress','lease-lost'].includes(first.json?.cache?.reason)?first.json.cache.reason:null;
              const failure=first.json?.cache?.failure;
              if(failure&&['download','validate','persist','unknown'].includes(failure.stage)&&['upstream-http','upstream-timeout','upstream-content-type','upstream-empty','upstream-size-limit','fetch-configuration','csv-invalid','download-or-runtime-failure','future-dated-feed','snapshot-invalid','storage-failure','unexpected-failure'].includes(failure.category))report.refreshFailure={stage:failure.stage,category:failure.category,...(Number.isInteger(failure.httpStatus)&&failure.httpStatus>=100&&failure.httpStatus<=599?{httpStatus:failure.httpStatus}:{})};
+             if(typeof failure?.errorId==='string'&&/^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(failure.errorId)){report.refreshErrorId=failure.errorId;report.exceptionCaptureReported=true;}
              if(first.status===200){validateFundView(first.json,series);assert.equal(first.json.snapshot.identityVerified,false);assert.equal(first.json.snapshot.alertEligible,false);const second=await local(route,headers);report.secondFundHttpStatus=second.status;assert.equal(second.status,200);validateFundView(second.json,series);report.cacheReused=second.json.cache?.state==='cached'&&second.json.snapshot.fetchedAt===first.json.snapshot.fetchedAt;report.refreshRestored=report.cacheReused;}
              report.outcome=report.pageVerified&&report.refreshRestored?'passed':'failed';report.stage='complete';
             }catch{report.outcome='failed';report.failedStage=report.stage;}
             finally{save();}
-            if(report.outcome!=='passed')core.setFailed('Hotfix verification incomplete; inspect the redacted refresh stage/category');
-      - name: Preserve truthful hotfix and refresh outcome
+            if(report.outcome!=='passed')core.setFailed('Price verification remains incomplete; inspect refreshErrorId in private Workers Logs');
+      - name: Preserve redacted status and correlation ID only
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
