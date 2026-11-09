@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "workflow": "Simplicity browser tests",
+  "sourceBranch": "main",
+  "testedCommit": "cbb993f492f6f0127d7f863c65cd1aa807a40412",
+  "runId": "42579235429",
+  "runNumber": "6",
+  "runAttempt": "1",
+  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/42579235429",
+  "generatedAt": "2026-11-09T07:26:43.922Z",
+  "jobResult": "success",
+  "outcome": "passed",
+  "reportState": "available",
+  "reportError": null,
+  "counts": {
+    "passed": 40,
+    "failed": 0,
+    "flaky": 0,
+    "skipped": 0
+  },
+  "browsers": {
+    "chromium-desktop": {
+      "passed": 20,
+      "failed": 0,
+      "flaky": 0,
+      "skipped": 0
+    },
+    "webkit-mobile": {
+      "passed": 20,
+      "failed": 0,
+      "flaky": 0,
+      "skipped": 0
+    }
+  },
+  "failures": [],
+  "skips": [],
+  "errors": []
+}
