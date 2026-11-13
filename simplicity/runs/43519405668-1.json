@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "scope": "simplicity-verification-job",
+  "repository": "Lukestaz/stock-watch",
+  "sourceSha": "49a6fe6a82f38607e9f40fa984686485f7540978",
+  "sourceRef": "refs/heads/main",
+  "runId": "43519405668",
+  "runNumber": "16",
+  "runAttempt": "1",
+  "recordedAt": "2026-11-13T22:27:51.093Z",
+  "jobResult": "success",
+  "checks": {
+    "simplicity": {
+      "schemaVersion": 1,
+      "name": "simplicity",
+      "startedAt": "2026-11-13T22:27:28.834Z",
+      "completedAt": "2026-11-13T22:27:30.699Z",
+      "processExitCode": 0,
+      "status": "passed",
+      "counts": {
+        "tests": 72,
+        "pass": 72,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      }
+    },
+    "accounts": {
+      "schemaVersion": 1,
+      "name": "accounts",
+      "startedAt": "2026-11-13T22:27:30.768Z",
+      "completedAt": "2026-11-13T22:27:35.015Z",
+      "processExitCode": 0,
+      "status": "passed",
+      "counts": {
+        "tests": 95,
+        "pass": 95,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      }
+    },
+    "ui": {
+      "schemaVersion": 1,
+      "name": "ui",
+      "startedAt": "2026-11-13T22:27:35.077Z",
+      "completedAt": "2026-11-13T22:27:35.103Z",
+      "processExitCode": 0,
+      "status": "passed"
+    },
+    "feeds": {
+      "schemaVersion": 1,
+      "name": "feeds",
+      "startedAt": "2026-11-13T22:27:35.143Z",
+      "completedAt": "2026-11-13T22:27:39.412Z",
+      "processExitCode": 0,
+      "status": "passed",
+      "feeds": [
+        {
+          "seriesId": "simplicity:kiwisaver:high-growth",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-11"
+        },
+        {
+          "seriesId": "simplicity:kiwisaver:growth",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-11"
+        },
+        {
+          "seriesId": "simplicity:kiwisaver:balanced",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-11"
+        },
+        {
+          "seriesId": "simplicity:kiwisaver:default",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-11"
+        },
+        {
+          "seriesId": "simplicity:kiwisaver:conservative",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-11"
+        },
+        {
+          "seriesId": "simplicity:kiwisaver:defensive",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-11"
+        },
+        {
+          "seriesId": "simplicity:investment:high-growth",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-11"
+        },
+        {
+          "seriesId": "simplicity:investment:growth",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-11"
+        },
+        {
+          "seriesId": "simplicity:investment:balanced",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-11"
+        },
+        {
+          "seriesId": "simplicity:investment:conservative",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-11"
+        }
+      ]
+    }
+  },
+  "outcome": "passed",
+  "deployed": false,
+  "remoteMigrationApplied": false,
+  "alertsActivated": false,
+  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/43519405668"
+}
