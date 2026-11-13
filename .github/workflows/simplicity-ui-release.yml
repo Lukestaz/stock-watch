@@ -1,0 +1,111 @@
+name: Release approved Simplicity UI
+on:
+  push:
+    branches: [main]
+    paths: ['config/simplicity-ui-release.json']
+permissions:
+  contents: read
+jobs:
+  checks:
+    if: github.repository == 'Lukestaz/stock-watch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: '51f4f4400f008a0aa2d913febbfe0ae1a067b654', path: application, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: '9bcea9ce1008847dca71069d48d1b0957c5193e0', path: ui, persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Validate approval request and compose the exact frontend/runtime pair
+        run: |
+          node --input-type=module <<'JS'
+          import {readFileSync,rmSync,cpSync} from 'node:fs';
+          import {validateRequest} from './scripts/simplicity-ui-release.mjs';
+          validateRequest(JSON.parse(readFileSync('config/simplicity-ui-release.json','utf8')));
+          for(const path of ['site','tests/dashboard']){rmSync('application/'+path,{recursive:true,force:true});cpSync('ui/'+path,'application/'+path,{recursive:true});}
+          cpSync('ui/worker/test/simplicity-fetch.test.mjs','application/worker/test/simplicity-fetch.test.mjs');
+          JS
+          node --test worker/test/simplicity-ui-release.test.mjs
+          node --test application/worker/test/simplicity-*.test.mjs application/worker/test/account-*.test.mjs application/tests/legacy-pages.test.mjs
+          node --check application/site/simplicity.js
+      - name: Install pinned browser test runner and browsers
+        working-directory: application/tests/dashboard
+        run: |
+          npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+          npx playwright install --with-deps chromium webkit
+      - name: Run synthetic desktop and mobile browser checks on the combined release
+        working-directory: application/tests/dashboard
+        env: {CI: 'true', PLAYWRIGHT_JSON_OUTPUT_NAME: results.json, PLAYWRIGHT_HTML_OPEN: never}
+        run: npm test -- simplicity.spec.mjs --reporter=list,json
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: simplicity-ui-browser-${{ github.run_id }}-${{ github.run_attempt }}
+          path: application/tests/dashboard/results.json
+          retention-days: 30
+          if-no-files-found: warn
+  deploy:
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency: {group: deploy-stock-watch-app, cancel-in-progress: false}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: '51f4f4400f008a0aa2d913febbfe0ae1a067b654', path: application, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: '9bcea9ce1008847dca71069d48d1b0957c5193e0', path: ui, persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verify expected live build, deploy without migrations and verify assets/API
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          RELEASE_WORK: ${{ runner.temp }}/simplicity-ui-release
+          REPORT_FILE: ${{ runner.temp }}/simplicity-ui-release.json
+        run: node scripts/simplicity-ui-release.mjs
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: simplicity-ui-release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/simplicity-ui-release.json
+          retention-days: 30
+          if-no-files-found: warn
+  publish:
+    needs: [checks, deploy]
+    if: always() && !cancelled() && github.repository == 'Lukestaz/stock-watch'
+    runs-on: ubuntu-latest
+    permissions: {contents: write, actions: read}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: simplicity-ui-release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release-report
+      - uses: actions/github-script@v7
+        env:
+          REPORT_FILE: ${{ runner.temp }}/release-report/simplicity-ui-release.json
+          CHECKS_RESULT: ${{ needs.checks.result }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+        with:
+          script: |
+            const fs=require('node:fs'),assert=require('node:assert/strict'),{owner,repo}=context.repo;
+            let r={schemaVersion:1,sourceSha:process.env.GITHUB_SHA,runId:process.env.GITHUB_RUN_ID,runNumber:process.env.GITHUB_RUN_NUMBER,runAttempt:process.env.GITHUB_RUN_ATTEMPT,outcome:'not-deployed',deploymentAttempted:false,deploymentVerified:false,migrationRequested:false,alertsActivated:false};
+            if(fs.existsSync(process.env.REPORT_FILE))r=JSON.parse(fs.readFileSync(process.env.REPORT_FILE,'utf8'));
+            assert.equal(r.sourceSha,process.env.GITHUB_SHA);assert.equal(r.runId,process.env.GITHUB_RUN_ID);assert.equal(r.runAttempt,process.env.GITHUB_RUN_ATTEMPT);assert.equal(r.migrationRequested,false);assert.equal(r.alertsActivated,false);
+            r.checksJobResult=process.env.CHECKS_RESULT;r.deployJobResult=process.env.DEPLOY_RESULT;r.runUrl=`https://github.com/${owner}/${repo}/actions/runs/${r.runId}`;
+            if(r.checksJobResult!=='success'||r.deployJobResult!=='success')r.outcome=r.deploymentAttempted?'failed':'not-deployed';
+            const text=JSON.stringify(r,null,2)+'\n',read=async(path,ref)=>{try{const f=(await github.rest.repos.getContent({owner,repo,path,ref})).data;return JSON.parse(Buffer.from(f.content,'base64').toString('utf8'));}catch(e){if(e.status===404)return null;throw e;}};
+            for(let i=0;i<4;i++){
+              const head=(await github.rest.git.getRef({owner,repo,ref:'heads/ci-results'})).data.object.sha,path=`simplicity-release/ui/runs/${r.runId}-${r.runAttempt}.json`;if(await read(path,head))return;
+              const base=(await github.rest.git.getCommit({owner,repo,commit_sha:head})).data.tree.sha,entry=path=>({path,mode:'100644',type:'blob',content:text}),entries=[entry(path)],old=await read('simplicity-release/ui/latest.json',head);
+              if(!old||Number(r.runNumber)>Number(old.runNumber)||(Number(r.runNumber)===Number(old.runNumber)&&Number(r.runAttempt)>Number(old.runAttempt)))entries.push(entry('simplicity-release/ui/latest.json'));
+              const tree=(await github.rest.git.createTree({owner,repo,base_tree:base,tree:entries})).data,commit=(await github.rest.git.createCommit({owner,repo,message:`Simplicity UI release ${r.runId}/${r.runAttempt}: ${r.outcome}`,tree:tree.sha,parents:[head]})).data;
+              try{await github.rest.git.updateRef({owner,repo,ref:'heads/ci-results',sha:commit.sha,force:false});return;}catch(e){if(![409,422].includes(e.status)||i===3)throw e;}
+            }
