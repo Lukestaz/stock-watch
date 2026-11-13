@@ -2,24 +2,24 @@
   "schemaVersion": 1,
   "scope": "simplicity-verification-job",
   "repository": "Lukestaz/stock-watch",
-  "sourceSha": "49a6fe6a82f38607e9f40fa984686485f7540978",
+  "sourceSha": "80d611f6ee02e79d27d03c92acb90b4b9beff046",
   "sourceRef": "refs/heads/main",
-  "runId": "43519405668",
-  "runNumber": "16",
+  "runId": "43523817731",
+  "runNumber": "17",
   "runAttempt": "1",
-  "recordedAt": "2026-11-13T22:27:51.093Z",
+  "recordedAt": "2026-11-13T23:01:10.271Z",
   "jobResult": "success",
   "checks": {
     "simplicity": {
       "schemaVersion": 1,
       "name": "simplicity",
-      "startedAt": "2026-11-13T22:27:28.834Z",
-      "completedAt": "2026-11-13T22:27:30.699Z",
+      "startedAt": "2026-11-13T23:00:47.940Z",
+      "completedAt": "2026-11-13T23:00:50.081Z",
       "processExitCode": 0,
       "status": "passed",
       "counts": {
-        "tests": 72,
-        "pass": 72,
+        "tests": 74,
+        "pass": 74,
         "fail": 0,
         "cancelled": 0,
         "skipped": 0
@@ -28,8 +28,8 @@
     "accounts": {
       "schemaVersion": 1,
       "name": "accounts",
-      "startedAt": "2026-11-13T22:27:30.768Z",
-      "completedAt": "2026-11-13T22:27:35.015Z",
+      "startedAt": "2026-11-13T23:00:50.135Z",
+      "completedAt": "2026-11-13T23:00:56.464Z",
       "processExitCode": 0,
       "status": "passed",
       "counts": {
@@ -43,16 +43,16 @@
     "ui": {
       "schemaVersion": 1,
       "name": "ui",
-      "startedAt": "2026-11-13T22:27:35.077Z",
-      "completedAt": "2026-11-13T22:27:35.103Z",
+      "startedAt": "2026-11-13T23:00:56.521Z",
+      "completedAt": "2026-11-13T23:00:56.547Z",
       "processExitCode": 0,
       "status": "passed"
     },
     "feeds": {
       "schemaVersion": 1,
       "name": "feeds",
-      "startedAt": "2026-11-13T22:27:35.143Z",
-      "completedAt": "2026-11-13T22:27:39.412Z",
+      "startedAt": "2026-11-13T23:00:56.590Z",
+      "completedAt": "2026-11-13T23:01:01.646Z",
       "processExitCode": 0,
       "status": "passed",
       "feeds": [
@@ -123,5 +123,5 @@
   "deployed": false,
   "remoteMigrationApplied": false,
   "alertsActivated": false,
-  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/43519405668"
+  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/43523817731"
 }
