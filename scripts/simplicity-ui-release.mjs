@@ -9,14 +9,15 @@ export const RUNTIME='51f4f4400f008a0aa2d913febbfe0ae1a067b654';
 export const APP='https://stock-watch-app.lukestaz.workers.dev';
 export const ACCOUNT='c4814713eafd41ae857b9a8097610df6';
 export const DB='4cb54afc-8f2d-4f62-8b6b-7d59f343b938';
-export const REQUEST={uiSha:UI,runtimeSha:RUNTIME,expectedBuild:RUNTIME,confirmation:'DEPLOY stock-watch-app UI9bcea9c RUNTIME51f4f44 ALERTS-OFF NO-MIGRATIONS'};
+export const REQUEST={attempt:2,uiSha:UI,runtimeSha:RUNTIME,expectedBuild:RUNTIME,confirmation:'DEPLOY stock-watch-app UI9bcea9c RUNTIME51f4f44 ALERTS-OFF NO-MIGRATIONS'};
 export function validateRequest(value){assert.deepEqual(value,REQUEST);return value;}
-export function validateHealth(h,build){assert.equal(h?.ok,true);assert.equal(h?.mode,'account-preview');assert.equal(h?.build,build);assert.equal(h?.database?.bound,true);assert.equal(h?.database?.ready,true);for(const k of ['verificationReady','enrollmentAvailable','scheduledConfigured'])assert.equal(h?.friendsAlerts?.[k],false);}
+export function validateHealth(h,build){assert.equal(h?.ok,true);assert.equal(h?.mode,'account-preview');assert.equal(h?.build,build);assert.equal(h?.database?.bound,true);assert.equal(h?.database?.ready,true);if(h.friendsAlerts!==undefined)for(const k of ['verificationReady','enrollmentAvailable','scheduledConfigured'])assert.equal(h.friendsAlerts?.[k],false);}
+export function validateAlertSettings(settings){assert.ok(Array.isArray(settings?.bindings));for(const [name,text] of [['FRIENDS_ALERTS_ENABLED','false'],['FRIENDS_ENROLLMENT_ENABLED','false'],['FRIENDS_SCHEDULE_ENABLED','false'],['SIMPLICITY_READ_ONLY','true']]){const matches=settings.bindings.filter(b=>b.name===name);assert.equal(matches.length,1);assert.equal(matches[0].type,'plain_text');assert.equal(matches[0].text,text);}}
 const digest=text=>createHash('sha256').update(text).digest('hex');
 async function execute(){
  const work=process.env.RELEASE_WORK,output=process.env.REPORT_FILE;
  assert.ok(work&&output&&process.env.CLOUDFLARE_API_TOKEN);mkdirSync(work,{recursive:true});
- const report={schemaVersion:1,sourceSha:process.env.GITHUB_SHA,runId:process.env.GITHUB_RUN_ID,runNumber:process.env.GITHUB_RUN_NUMBER,runAttempt:process.env.GITHUB_RUN_ATTEMPT,uiSha:UI,runtimeSha:RUNTIME,worker:'stock-watch-app',databaseId:DB,outcome:'running',stage:'preflight',deploymentAttempted:false,deploymentVerified:false,migrationRequested:false,alertsActivated:false,automaticRollbackPerformed:false};
+ const report={schemaVersion:1,sourceSha:process.env.GITHUB_SHA,runId:process.env.GITHUB_RUN_ID,runNumber:process.env.GITHUB_RUN_NUMBER,runAttempt:process.env.GITHUB_RUN_ATTEMPT,attempt:REQUEST.attempt,uiSha:UI,runtimeSha:RUNTIME,worker:'stock-watch-app',databaseId:DB,outcome:'running',stage:'preflight',deploymentAttempted:false,deploymentVerified:false,migrationRequested:false,alertsActivated:false,automaticRollbackPerformed:false};
  const save=()=>{report.updatedAt=new Date().toISOString();writeFileSync(output,JSON.stringify(report,null,2)+'\n');};
  const cli=args=>execFileSync('npx',['--yes','wrangler@4.150.0',...args,'--config',join(work,'wrangler.jsonc')],{cwd:work,encoding:'utf8',timeout:300000,maxBuffer:8388608,stdio:['ignore','pipe','pipe'],env:{...process.env,CLOUDFLARE_ACCOUNT_ID:ACCOUNT,CI:'true',WRANGLER_SEND_METRICS:'false'}});
  async function read(url,headers={},redirect='error'){
@@ -33,7 +34,7 @@ async function execute(){
   for(const [path,sha] of [['application',RUNTIME],['ui',UI]])assert.equal(execFileSync('git',['-C',path,'rev-parse','HEAD'],{encoding:'utf8'}).trim(),sha);
   const before=await local('/api/health');assert.equal(before.status,200);validateHealth(before.json,RUNTIME);report.previousBuild=before.json.build;save();
   const {configuration,validateSchema}=await import(pathToFileURL(resolve('application/scripts/simplicity-production.mjs')).href);
-  const settings=await api('settings'),config=configuration(settings);
+  const settings=await api('settings');validateAlertSettings(settings);const config=configuration(settings);report.alertSettingsVerified=true;
   assert.equal(settings.bindings.find(b=>b.name==='SIMPLICITY_READ_ONLY')?.text,'true');assert.equal(settings.observability?.logs?.destinations?.length||0,0);
   const schedules=await api('schedules');assert.equal((Array.isArray(schedules)?schedules:schedules.schedules)?.length,0);
   const deployments=await api('deployments'),list=Array.isArray(deployments)?deployments:deployments.deployments;
@@ -50,7 +51,7 @@ async function execute(){
   report.stage='deploy';report.deploymentAttempted=true;save();cli(['deploy']);
   report.stage='verify';save();let healthy=false;
   for(let i=0;i<6;i++){try{const h=await local('/api/health');assert.equal(h.status,200);validateHealth(h.json,process.env.GITHUB_SHA);healthy=true;break;}catch{}if(i<5)await new Promise(r=>setTimeout(r,5000));}assert.equal(healthy,true);
-  const after=await api('settings');configuration(after);assert.equal(after.bindings.find(b=>b.name==='BUILD_SHA')?.text,process.env.GITHUB_SHA);assert.equal(after.bindings.find(b=>b.name==='UI_BUILD_SHA')?.text,UI);assert.equal(after.bindings.find(b=>b.name==='RUNTIME_BUILD_SHA')?.text,RUNTIME);assert.deepEqual(after.bindings.filter(b=>b.type==='secret_text').map(b=>b.name).sort(),secrets);
+  const after=await api('settings');validateAlertSettings(after);configuration(after);assert.equal(after.bindings.find(b=>b.name==='BUILD_SHA')?.text,process.env.GITHUB_SHA);assert.equal(after.bindings.find(b=>b.name==='UI_BUILD_SHA')?.text,UI);assert.equal(after.bindings.find(b=>b.name==='RUNTIME_BUILD_SHA')?.text,RUNTIME);assert.deepEqual(after.bindings.filter(b=>b.type==='secret_text').map(b=>b.name).sort(),secrets);
   assert.equal(after.observability?.enabled,true);assert.equal(after.observability?.logs?.enabled,true);assert.equal(after.observability?.logs?.invocation_logs,false);assert.notEqual(after.observability?.logs?.persist,false);assert.equal(after.observability?.logs?.destinations?.length||0,0);
   const afterSchedules=await api('schedules');assert.equal((Array.isArray(afterSchedules)?afterSchedules:afterSchedules.schedules)?.length,0);
   let page=await local('/simplicity.html',{},'manual');
