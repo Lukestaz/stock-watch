@@ -1,0 +1,13 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
+import {execFileSync} from 'node:child_process';
+const source=readFileSync(new URL('../../site/simplicity.js',import.meta.url),'utf8');
+const formatter=source.match(/^const format = .+\nconst date = .+$/m)?.[0];
+assert.equal(typeof formatter,'string','shared date formatter must be present');
+const display=value=>runInNewContext(formatter+'\ndate(value);',{Intl,Date,value},{timeout:1000});
+test('fund dates include three-letter weekdays',()=>{for(const [value,label] of [['2026-11-11','Wed, 11 Nov 2026'],['2026-11-14','Sat, 14 Nov 2026'],['2024-02-29','Thu, 29 Feb 2024'],['2026-01-01','Thu, 1 Jan 2026']])assert.equal(display(value),label);});
+test('date-only weekdays stay unchanged across host timezones',()=>{for(const TZ of ['Pacific/Auckland','America/Los_Angeles','Pacific/Honolulu'])assert.equal(execFileSync(process.execPath,['-e',formatter+"\nconsole.log(date('2026-11-11'));"],{encoding:'utf8',env:{...process.env,TZ}}).trim(),'Wed, 11 Nov 2026');});
+test('history rows use the shared weekday formatter',()=>{assert.ok(source.includes('for(const text of [date(r.asOfDate),'));});
+test('headline retains its machine-readable ISO date',()=>{assert.ok(source.includes("$('#price-date').dateTime=s.asOfDate"));});

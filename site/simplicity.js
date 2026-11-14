@@ -7,7 +7,7 @@ try { saved = JSON.parse(localStorage.getItem(key)) || {}; } catch {}
 scheme.value = Object.hasOwn(catalogue, saved.scheme) ? saved.scheme : 'kiwisaver';
 let range = ['30','90','180','365','all'].includes(saved.range) ? saved.range : '180';
 let displayed = null, controller = null, sequence = 0, expanded = false, rows = [], points = [], inspected = -1;
-const format = new Intl.DateTimeFormat('en-NZ',{ day:'numeric',month:'short',year:'numeric',timeZone:'UTC' });
+const format = new Intl.DateTimeFormat('en-NZ',{ weekday:'short',day:'numeric',month:'short',year:'numeric',timeZone:'UTC' });
 const date = value => format.format(new Date(value + 'T00:00:00Z'));
 const change = (price, previous) => previous ? { amount:price-previous, percent:100*(price/previous-1) } : null;
 const signed = (value, places) => { const n = Number(value.toFixed(places)); return (n>0?'+':n<0?'−':'') + Math.abs(n).toFixed(places); };
@@ -46,7 +46,7 @@ function table() {
   const history=displayed.history, body=$('#history'); body.replaceChildren();
   for(let i=history.length-1;i>=(expanded?0:Math.max(0,history.length-7));i--) {
     const r=history[i], c=change(r.price,history[i-1]?.price), tr=document.createElement('tr');
-    for(const text of [r.asOfDate,'$'+r.price.toFixed(4),c?signed(c.percent,2)+'%':'—']) { const td=document.createElement('td');td.textContent=text;tr.append(td); }
+    for(const text of [date(r.asOfDate),'$'+r.price.toFixed(4),c?signed(c.percent,2)+'%':'—']) { const td=document.createElement('td');td.textContent=text;tr.append(td); }
     tint(tr.lastElementChild,c);body.append(tr);
   }
   const toggle=$('#history-toggle');toggle.hidden=history.length<=7;toggle.textContent=expanded?'Show recent':`View all (${history.length})`;toggle.setAttribute('aria-expanded',String(expanded));
