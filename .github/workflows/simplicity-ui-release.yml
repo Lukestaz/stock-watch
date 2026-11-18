@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v4
         with: {ref: '51f4f4400f008a0aa2d913febbfe0ae1a067b654', path: application, persist-credentials: false}
       - uses: actions/checkout@v4
-        with: {ref: '9bcea9ce1008847dca71069d48d1b0957c5193e0', path: ui, persist-credentials: false}
+        with: {ref: '51e99d3bc598e99a42e74190cb845724b25cca90', path: ui, persist-credentials: false}
       - uses: actions/setup-node@v4
         with: {node-version: '22'}
       - uses: actions/setup-python@v5
@@ -29,6 +29,7 @@ jobs:
           validateRequest(JSON.parse(readFileSync('config/simplicity-ui-release.json','utf8')));
           for(const path of ['site','tests/dashboard']){rmSync('application/'+path,{recursive:true,force:true});cpSync('ui/'+path,'application/'+path,{recursive:true});}
           cpSync('ui/worker/test/simplicity-fetch.test.mjs','application/worker/test/simplicity-fetch.test.mjs');
+          cpSync('ui/worker/test/simplicity-date-display.test.mjs','application/worker/test/simplicity-date-display.test.mjs');
           JS
           node --test worker/test/simplicity-ui-release.test.mjs
           node --test application/worker/test/simplicity-*.test.mjs application/worker/test/account-*.test.mjs application/tests/legacy-pages.test.mjs
@@ -60,7 +61,7 @@ jobs:
       - uses: actions/checkout@v4
         with: {ref: '51f4f4400f008a0aa2d913febbfe0ae1a067b654', path: application, persist-credentials: false}
       - uses: actions/checkout@v4
-        with: {ref: '9bcea9ce1008847dca71069d48d1b0957c5193e0', path: ui, persist-credentials: false}
+        with: {ref: '51e99d3bc598e99a42e74190cb845724b25cca90', path: ui, persist-credentials: false}
       - uses: actions/setup-node@v4
         with: {node-version: '22'}
       - name: Verify expected live build, deploy without migrations and verify assets/API

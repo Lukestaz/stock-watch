@@ -4,7 +4,7 @@ import {createApp} from '../src/account-app.mjs';
 import {REQUEST,RUNTIME,APP,validateRequest,validateHealth,validateAlertSettings} from '../../scripts/simplicity-ui-release.mjs';
 const health=()=>({ok:true,mode:'account-preview',build:RUNTIME,database:{bound:true,ready:true}});
 const settings=()=>({bindings:[...['FRIENDS_ALERTS_ENABLED','FRIENDS_ENROLLMENT_ENABLED','FRIENDS_SCHEDULE_ENABLED'].map(name=>({name,type:'plain_text',text:'false'})),{name:'SIMPLICITY_READ_ONLY',type:'plain_text',text:'true'}]});
-test('accepts only the exact reviewed retry request',()=>{assert.equal(REQUEST.attempt,2);assert.deepEqual(validateRequest({...REQUEST}),REQUEST);});
+test('accepts only the exact reviewed retry request',()=>{assert.equal(REQUEST.attempt,3);assert.deepEqual(validateRequest({...REQUEST}),REQUEST);});
 test('rejects altered pins, confirmation, missing attempt and extra fields',()=>{for(const field of Object.keys(REQUEST))assert.throws(()=>validateRequest({...REQUEST,[field]:'changed'}));const old={...REQUEST};delete old.attempt;assert.throws(()=>validateRequest(old));assert.throws(()=>validateRequest({...REQUEST,deployAnyway:true}));assert.throws(()=>validateRequest(null));});
 test('real production health handler has no alert-capability fields',async()=>{
  const app=createApp({accounts:{enabled:true,allowedOrigin:APP,handle:async()=>new Response('unused')}});
@@ -26,3 +26,4 @@ test('optional health alert capabilities must also be explicitly false if suppli
  const flags={verificationReady:false,enrollmentAvailable:false,scheduledConfigured:false};validateHealth({...health(),friendsAlerts:flags},RUNTIME);
  assert.throws(()=>validateHealth({...health(),friendsAlerts:{}},RUNTIME));for(const key of Object.keys(flags))assert.throws(()=>validateHealth({...health(),friendsAlerts:{...flags,[key]:true}},RUNTIME));
 });
+test('preflight matches deployed build rather than runtime source',()=>{const h={...health(),build:'80d611f6ee02e79d27d03c92acb90b4b9beff046'};assert.equal(REQUEST.expectedBuild,h.build);validateHealth(h,REQUEST.expectedBuild);assert.throws(()=>validateHealth(h,RUNTIME));});
