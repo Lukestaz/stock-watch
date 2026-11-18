@@ -1,41 +1,29 @@
 {
   "schemaVersion": 1,
-  "sourceSha": "80d611f6ee02e79d27d03c92acb90b4b9beff046",
-  "runId": "43523820837",
-  "runNumber": "2",
+  "sourceSha": "95d31b2e7b640b66dceaee0f78f3086f06274122",
+  "runId": "44380110277",
+  "runNumber": "3",
   "runAttempt": "1",
-  "attempt": 2,
-  "uiSha": "9bcea9ce1008847dca71069d48d1b0957c5193e0",
+  "attempt": 3,
+  "uiSha": "51e99d3bc598e99a42e74190cb845724b25cca90",
   "runtimeSha": "51f4f4400f008a0aa2d913febbfe0ae1a067b654",
   "worker": "stock-watch-app",
   "databaseId": "4cb54afc-8f2d-4f62-8b6b-7d59f343b938",
-  "outcome": "passed",
-  "stage": "complete",
+  "outcome": "failed",
+  "stage": "verify",
   "deploymentAttempted": true,
-  "deploymentVerified": true,
+  "deploymentVerified": false,
   "migrationRequested": false,
   "alertsActivated": false,
   "automaticRollbackPerformed": false,
-  "previousBuild": "51f4f4400f008a0aa2d913febbfe0ae1a067b654",
-  "updatedAt": "2026-11-13T23:02:20.528Z",
+  "previousBuild": "80d611f6ee02e79d27d03c92acb90b4b9beff046",
+  "updatedAt": "2026-11-18T19:25:43.240Z",
   "alertSettingsVerified": true,
-  "previousDeploymentId": "4faf1cde-98c6-481c-9049-0a9e8dc54309",
-  "previousVersionId": "b9647bee-a73a-4b24-9f86-fd66243133e7",
+  "previousDeploymentId": "5e32743f-2658-4ddf-9783-7e3f69847490",
+  "previousVersionId": "49ef8e07-6ae4-4559-9560-c16900160c6d",
   "schemaVerified": true,
-  "assetsVerified": true,
-  "fundChecks": [
-    {
-      "seriesId": "simplicity:kiwisaver:high-growth",
-      "observationDate": "2026-11-11",
-      "cacheReused": true
-    },
-    {
-      "seriesId": "simplicity:investment:high-growth",
-      "observationDate": "2026-11-11",
-      "cacheReused": true
-    }
-  ],
+  "failedStage": "verify",
   "checksJobResult": "success",
-  "deployJobResult": "success",
-  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/43523820837"
+  "deployJobResult": "failure",
+  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/44380110277"
 }
