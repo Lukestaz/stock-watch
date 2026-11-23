@@ -1,4 +1,5 @@
 import { appendFileSync } from 'node:fs';
+import { inspectFeedResponse } from './simplicity-http-evidence.mjs';
 import { fetchSimplicityHistory } from '../worker/src/simplicity-fetch.mjs';
 import { DOWNLOAD_EVIDENCE } from '../worker/src/simplicity-feed-health.mjs';
 import { buildFundSnapshot } from '../worker/src/simplicity-snapshot.mjs';
@@ -19,10 +20,14 @@ for (const fund of DOWNLOAD_EVIDENCE) {
       // Probe opt-in only; does not update catalogue or identity verification.
       verificationStatus: 'verified'
     }, { fetchImpl: async (input, options) => {
+      report.requestUrl = input;
+      report.requestAccept = options.headers.Accept;
+      report.redirectMode = options.redirect;
       const response = await fetch(input, options);
       report.status = response.status;
       report.contentType = response.headers.get('content-type');
       report.declaredBytes = response.headers.get('content-length');
+      Object.assign(report, await inspectFeedResponse(response));
       if (!response.body || !response.ok) return response;
       const counted = response.body.pipeThrough(new TransformStream({
         transform(chunk, controller) {
