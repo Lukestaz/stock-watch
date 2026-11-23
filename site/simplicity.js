@@ -1,4 +1,4 @@
-import { validateFundView } from './simplicity-view.mjs';
+import { validateFundView, renderFundContext } from './simplicity-view.mjs';
 const $ = s => document.querySelector(s), scheme = $('#scheme'), fund = $('#fund'), result = $('#result'), status = $('#status'), reload = $('#reload'), chart = $('#chart');
 const catalogue = { kiwisaver:[['high-growth','High Growth'],['growth','Growth'],['balanced','Balanced'],['default','Default'],['conservative','Conservative'],['defensive','Defensive']], investment:[['high-growth','High Growth'],['growth','Growth'],['balanced','Balanced'],['conservative','Conservative']] };
 const key = 'stock-watch:simplicity-ui:v1';
@@ -58,6 +58,7 @@ function render(data,cache) {
   $('#change').textContent=changeText(c);tint($('#change'),c);$('#change-date').textContent=previous?'since '+date(previous.asOfDate):'No earlier observation';
   $('#stale-badge').hidden=cache!=='stale'&&s.freshness!=='stale';
   $('#metadata').textContent=`Observation date: ${s.asOfDate}\nRetrieved: ${new Date(s.fetchedAt).toLocaleString('en-NZ',{timeZone:'Pacific/Auckland'})} (NZ time)\nD1 cache: ${cache}\nPublication freshness: ${s.freshness||'unchecked'}\nIdentity: unverified; alerts: disabled`;
+  renderFundContext(result,s,cache);
   table();draw();result.hidden=false;
   message(cache==='stale'?'Refresh unavailable — showing stale data dated '+date(s.asOfDate)+'.':s.freshness==='stale'?'Prices are behind the expected publication date.':'','warning');
 }
