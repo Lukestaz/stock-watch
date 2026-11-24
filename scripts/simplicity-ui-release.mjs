@@ -4,12 +4,12 @@ import {resolve,join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
-export const UI='51e99d3bc598e99a42e74190cb845724b25cca90';
+export const UI='a53edf3261045028cf0cb91f8536914da45f2296';
 export const RUNTIME='51f4f4400f008a0aa2d913febbfe0ae1a067b654';
 export const APP='https://stock-watch-app.lukestaz.workers.dev';
 export const ACCOUNT='c4814713eafd41ae857b9a8097610df6';
 export const DB='4cb54afc-8f2d-4f62-8b6b-7d59f343b938';
-export const REQUEST={attempt:3,uiSha:UI,runtimeSha:RUNTIME,expectedBuild:'80d611f6ee02e79d27d03c92acb90b4b9beff046',confirmation:'DEPLOY stock-watch-app UI51e99d3 RUNTIME51f4f44 ALERTS-OFF NO-MIGRATIONS'};
+export const REQUEST={attempt:4,uiSha:UI,runtimeSha:RUNTIME,expectedBuild:'95d31b2e7b640b66dceaee0f78f3086f06274122',confirmation:'DEPLOY stock-watch-app UIa53edf3 RUNTIME51f4f44 ALERTS-OFF NO-MIGRATIONS'};
 export function validateRequest(value){assert.deepEqual(value,REQUEST);return value;}
 export function validateHealth(h,build){assert.equal(h?.ok,true);assert.equal(h?.mode,'account-preview');assert.equal(h?.build,build);assert.equal(h?.database?.bound,true);assert.equal(h?.database?.ready,true);if(h.friendsAlerts!==undefined)for(const k of ['verificationReady','enrollmentAvailable','scheduledConfigured'])assert.equal(h.friendsAlerts?.[k],false);}
 export function validateAlertSettings(settings){assert.ok(Array.isArray(settings?.bindings));for(const [name,text] of [['FRIENDS_ALERTS_ENABLED','false'],['FRIENDS_ENROLLMENT_ENABLED','false'],['FRIENDS_SCHEDULE_ENABLED','false'],['SIMPLICITY_READ_ONLY','true']]){const matches=settings.bindings.filter(b=>b.name===name);assert.equal(matches.length,1);assert.equal(matches[0].type,'plain_text');assert.equal(matches[0].text,text);}}
@@ -48,6 +48,12 @@ async function execute(){
   const sql="SELECT name,type,sql FROM sqlite_schema WHERE name IN ('simplicity_fetch_state','simplicity_observations'); PRAGMA table_info(simplicity_fetch_state); PRAGMA table_info(simplicity_observations); PRAGMA foreign_key_list(simplicity_observations); PRAGMA table_info(d1_migrations);";
   const schema=JSON.parse(cli(['d1','execute','DB','--remote','--command',sql,'--json']));assert.ok(Array.isArray(schema)&&schema.every(r=>r.success===true));validateSchema(schema);report.schemaVerified=true;
   const last=await local('/api/health');assert.equal(last.status,200);validateHealth(last.json,REQUEST.expectedBuild);
+  const {validateFundView:validatePreflightFundView}=await import(pathToFileURL(resolve('ui/site/simplicity-view.mjs')).href);report.preflightFundChecks=[];
+  for(const series of ['simplicity:kiwisaver:high-growth','simplicity:investment:high-growth']){
+   const response=await local('/api/v1/fund?series='+encodeURIComponent(series),{Origin:APP,'Sec-Fetch-Site':'same-origin'});
+   report.preflightFundChecks.push({seriesId:series,status:response.status});save();assert.equal(response.status,200);
+   validatePreflightFundView(response.json,series);assert.equal(response.json.snapshot.identityVerified,false);assert.equal(response.json.snapshot.alertEligible,false);
+  }
   report.stage='deploy';report.deploymentAttempted=true;save();cli(['deploy']);
   report.stage='verify';save();let healthy=false;
   for(let i=0;i<6;i++){try{const h=await local('/api/health');assert.equal(h.status,200);validateHealth(h.json,process.env.GITHUB_SHA);healthy=true;break;}catch{}if(i<5)await new Promise(r=>setTimeout(r,5000));}assert.equal(healthy,true);
