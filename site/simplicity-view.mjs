@@ -27,6 +27,7 @@ export function chartPoints(rows) {
 
 export function publicationLabel(freshness) {
   switch (freshness) {
+    case 'current':
     case 'fresh': return 'Meets the configured expected date; latest publication not independently verified';
     case 'stale': return 'Behind the configured expected date';
     case 'future-dated': return 'Future-dated observation; source needs review';
