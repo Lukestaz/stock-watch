@@ -45,3 +45,7 @@ Account watchlist edits do not enroll scheduled alerts. The legacy monitor uses 
 ## Remaining release checks
 
 Review and merge the feature branch; verify the main app and price workflows; verify the old URL serves only the notice; and confirm monitor/catalogue-to-app publishing on a subsequent appropriate run. Do not trigger a real alert run solely to verify publishing without approval. Chart zoom/date-selection preservation remains a separate low-priority issue.
+
+## Simplicity documentation
+
+Start with the [consolidated Simplicity handover](docs/simplicity-status.md) and [agent instructions](AGENTS.md). The [documentation map](docs/simplicity/documentation-map.md) links the separate research, proposed modelling design, source inventory and project-instructions draft. These are research/documentation records, not proof of current production health or approval to enable estimates, deploy or activate alerts. KiwiSaver and Investment fund identities and price series remain distinct.

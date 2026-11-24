@@ -17,3 +17,16 @@ At meaningful checkpoints, update the relevant status document with what changed
 - Fund observation date, retrieval timestamp, cache TTL and publication freshness are separate concepts. A successful download does not independently verify fund identity.
 - Do not apply remote migrations, deploy, enable feature flags, activate alerts or send test notifications merely because code or tests were approved. Obtain the action-specific approval required by the execution environment.
 - Never bypass D1 and its refresh coordination when fund persistence is unavailable.
+
+## Simplicity research and documentation
+
+Keep [docs/simplicity-status.md](docs/simplicity-status.md) as the authoritative consolidated checkpoint. Its historical sections are dated evidence, not current production verification.
+
+- [Documentation map](docs/simplicity/documentation-map.md): research records and integration plan; its original local-bundle wording is historical preparation context, not current commit status.
+- [Research log](docs/simplicity/research.md): observations, decisions, uncertainty and planned evidence collection.
+- [Modelling design](docs/simplicity/design.md): proposed records and calculation boundaries, not an implemented model.
+- [Source inventory](config/simplicity/sources.json): research-only provenance; reported retrieval is not source review or modelling approval.
+- [Project-instructions draft](docs/simplicity/project-instructions.md): copyable settings text; repository commits do not update project settings.
+- [Release handover](docs/simplicity-ui-release.md): historical release context; resolve current manifest pins and result records before any release action.
+
+Cover KiwiSaver and Investment funds without merging their identities or price series. Verify the full official catalogue; the initial nine-fund document inventory is not exhaustive. Preserve exact source URLs, revisions, dates, supporting passages and unknowns. AI-extracted parameters remain provisional until reviewed. Use deterministic tested calculations and keep official observations, unpublished-price estimates and forward scenarios separate. Research does not authorise numerical estimate availability, executable switch prices, release actions or alert activation.
