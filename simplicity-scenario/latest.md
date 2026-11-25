@@ -1,8 +1,8 @@
 # Simplicity scenario test result
 
-Source: 149d17e1d60b26dc3b006594916d0106ce4bef4c
+Source: d55f0cf30f839c618e77e4e2fb457b8dab95833e
 Ref: refs/heads/feat/simplicity-scenario-prototype
-Run: 45536528350, attempt 1
+Run: 45588870864, attempt 1
 Test job: success
 Browser validation: passed
 Outcome: passed

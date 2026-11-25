@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "scope": "scenario-test-job",
+  "sourceSha": "d55f0cf30f839c618e77e4e2fb457b8dab95833e",
+  "sourceRef": "refs/heads/feat/simplicity-scenario-prototype",
+  "runId": "45588870864",
+  "runAttempt": "1",
+  "runNumber": "3",
+  "recordedAt": "2026-11-25T09:49:18.614Z",
+  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/45588870864",
+  "jobResult": "success",
+  "workflowConclusion": null,
+  "outcome": "passed",
+  "browserValidation": "passed",
+  "passed": 14,
+  "failed": 0,
+  "skipped": 0,
+  "flaky": 0,
+  "evidence": {
+    "kind": "trusted-workflow-summary",
+    "summaryAvailable": true,
+    "summarySourceMatched": true,
+    "rawReportStored": false
+  },
+  "deployed": false,
+  "alertsActivated": false
+}
