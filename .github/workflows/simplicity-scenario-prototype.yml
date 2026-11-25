@@ -1,0 +1,53 @@
+name: Simplicity scenario prototype tests
+on:
+  push:
+    branches: [feat/simplicity-scenario-prototype]
+    paths: ['prototypes/simplicity-scenario/**', 'worker/src/simplicity-catalogue.mjs', 'tests/dashboard/package*.json', '.github/workflows/simplicity-scenario-prototype.yml']
+  pull_request:
+    branches: [main]
+    paths: ['prototypes/simplicity-scenario/**', 'worker/src/simplicity-catalogue.mjs', 'tests/dashboard/package*.json', '.github/workflows/simplicity-scenario-prototype.yml']
+permissions:
+  contents: read
+concurrency:
+  group: scenario-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+jobs:
+  scenario-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run deterministic unit, HTTP and report-validator tests
+        run: node --test prototypes/simplicity-scenario/engine.test.mjs prototypes/simplicity-scenario/serve.test.mjs prototypes/simplicity-scenario/verify-browser-report.test.mjs
+      - name: Install existing pinned runner without lifecycle scripts
+        run: npm install --prefix tests/dashboard --ignore-scripts --no-audit --no-fund --package-lock=false
+      - name: Require the existing exact Playwright version
+        run: node -e "const v=require('./tests/dashboard/node_modules/@playwright/test/package.json').version;if(v!=='1.64.1')throw new Error('Unexpected Playwright '+v);console.log('Playwright '+v);"
+      - name: Install both required test browsers
+        run: node tests/dashboard/node_modules/@playwright/test/cli.js install --with-deps chromium webkit
+      - name: Run the pinned Chromium and WebKit suite
+        env:
+          CI: 'true'
+        run: node tests/dashboard/node_modules/@playwright/test/cli.js test --config prototypes/simplicity-scenario/browser.config.mjs
+      - name: Require all fourteen browser executions and record provenance
+        if: ${{ always() }}
+        run: node prototypes/simplicity-scenario/verify-browser-report.mjs scenario-browser-results.json scenario-browser-summary.json
+      - name: Preserve synthetic reports and failure traces
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: scenario-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            scenario-browser-results.json
+            scenario-browser-summary.json
+            scenario-test-results/
+          retention-days: 7
+          if-no-files-found: warn
