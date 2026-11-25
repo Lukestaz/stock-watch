@@ -10,11 +10,15 @@ Existing verification paths remain simplicity/latest.json, simplicity/latest.md,
 
 Read simplicity-scenario/latest.json, simplicity-scenario/latest.md or simplicity-scenario/runs/<run-id>-<attempt>.json. The seed for 45531794511/1 was saved on ci-results at eef56470f62bd9065ee803fcdafe613637a0efb8 and read back through GitHub. Its original evidence remains user-supplied: 14 browser passes plus passing validation, not an independently established full job/workflow conclusion.
 
-The scenario workflow adds a separate publisher only for push events in Lukestaz/stock-watch on feat/simplicity-scenario-prototype. Tests/PRs retain contents:read. Only the publisher receives contents:write/actions:read; it writes bounded JSON/Markdown under simplicity-scenario/ on ci-results. PR and fork events cannot publish. No pull_request_target trigger is used.
+The scenario workflow has a separate publisher only for push events in Lukestaz/stock-watch on feat/simplicity-scenario-prototype. Tests/PRs retain contents:read. Only the publisher receives contents:write/actions:read; it writes bounded JSON/Markdown under simplicity-scenario/ on ci-results. PR and fork events cannot publish. No pull_request_target trigger is used. Extending main-push publication remains a separate policy decision.
 
 Published records distinguish jobResult, browserValidation, outcome and workflowConclusion=null. A successful test job and source-matched passing 14-case validator summary are both required for outcome=passed. Missing/unmatched evidence cannot pass; unknown counts remain null. Newer numeric run IDs/attempts advance latest regardless of success. Permanent run-attempt records are not overwritten. Existing trees, other folders and concurrent writers are preserved through non-force updates with bounded retries. Source/run identity conflicts fail closed.
 
 Reports/traces remain synthetic Actions artifacts with seven-day retention. A publication proves a record was written, not the whole workflow finished successfully. Repository-write permission is job-scoped, not cryptographically restricted to ci-results; trusted-source review remains necessary. Runner/setup/cancellation/permission failures can prevent publication entirely. Check the expected commit before trusting latest.
+
+## Verified automatic-publication checkpoint
+
+On 2026-11-25 NZDT, connector reads of latest.json and runs/45536528350-1.json both returned Git blob 3fe2e2abefeadbe285b2a007342e8828756c75e9. Source 149d17e1d60b26dc3b006594916d0106ce4bef4c, prototype ref, run 45536528350, attempt 1, run number 2; recorded 2026-11-25T02:58:42.353Z. jobResult=success, browserValidation=passed, outcome=passed, passed=14, failed/skipped/flaky=0. Evidence is trusted-workflow-summary with summaryAvailable and summarySourceMatched true. Automatic publication and direct retrieval are verified for this run. workflowConclusion=null remains intentional; do not infer full workflow completion or extend the pass to later commits. See [integration review](simplicity/integration-review.md) for the reviewed main/source revisions and limitations.
 
 No deployment, remote migration, private financial data, provider-secret changes or notification delivery is part of these jobs. Source extraction, live D1, pricing validity and activation remain separate gates.
 
