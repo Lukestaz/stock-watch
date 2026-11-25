@@ -1,5 +1,6 @@
 import './navigation.js';
 import {accountSession} from './account-session.mjs';
+import {mountFriendsEmailSettings} from './account-friends-email.mjs';
 const CLIENT_ID='19866673111-hg5958bvoiqoa5crrt0jmalvh1mssfvk.apps.googleusercontent.com';
 const APP_ORIGIN='https://stock-watch-app.lukestaz.workers.dev';
 if(location.origin===APP_ORIGIN)mount();else accountSession.set('guest');
@@ -15,7 +16,7 @@ function mount(){
  const googleButton=document.createElement('div');googleButton.style.cssText='min-height:44px;max-width:100%;overflow:auto';
  const note=document.createElement('p');note.className='muted';note.textContent='Account edits save to the cloud. Guest edits stay on this device. Neither list is automatically copied into the other. Scheduled alerts are unchanged.';
  retry.hidden=logout.hidden=true;panel.append(status,googleButton,retry,recheck,close,note);header.after(panel);
- let available=false,signedIn=false,busy=false,sdkPromise,generation=0,channel;try{channel=new BroadcastChannel('stock-watch-session');}catch{}
+ let available=false,signedIn=false,busy=false,sdkPromise,generation=0,channel,alertsUi;try{channel=new BroadcastChannel('stock-watch-session');}catch{}
  const message=text=>{status.textContent=text;};
  const clearGoogle=()=>{generation++;googleButton.replaceChildren();};
  function renderSession(value){
@@ -37,6 +38,10 @@ function mount(){
   if(busy)return;busy=true;
   try{
    const health=await fetch('/api/health',{cache:'no-store',credentials:'same-origin',redirect:'error',signal:AbortSignal.timeout(15000)});if(!health.ok)throw Error();const h=await health.json();
+   if(h.friendsAlerts?.verificationReady===true){
+    if(!alertsUi)alertsUi=mountFriendsEmailSettings({root:panel,session:accountSession,enrollmentAvailable:h.friendsAlerts.enrollmentAvailable===true});
+    else alertsUi.setEnrollmentAvailable(h.friendsAlerts.enrollmentAvailable===true);
+   }else{alertsUi?.destroy();alertsUi=null;}
    available=h.ok===true&&h.mode==='account-preview'&&h.database?.bound===true&&h.database?.ready===true;
    if(!available){if(accountSession.hasUnsaved()){message('Account service unavailable. Unsaved edits kept in this tab.');return;}session(false);message('Accounts are disabled. Guest changes stay on this device.');return;}
    const r=await api('watchlist');
@@ -45,7 +50,7 @@ function mount(){
     if(accountSession.hasUnsaved()){message('Session expired. Copy or discard unsaved edits before changing session.');return;}
     clearGoogle();session(false);message('Sign in with Google. Your guest list will not be uploaded.');
    }else throw Error();
-  }catch{available=false;retry.hidden=true;if(!accountSession.hasUnsaved())accountSession.set('unavailable');message('Session check failed. Unsaved edits, if any, remain in this tab. Retry Check session.');}
+  }catch{alertsUi?.destroy();alertsUi=null;available=false;retry.hidden=true;if(!accountSession.hasUnsaved())accountSession.set('unavailable');message('Session check failed. Unsaved edits, if any, remain in this tab. Retry Check session.');}
   finally{busy=false;}
  }
  async function begin(){
