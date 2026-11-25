@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "dateLocal": "2026-11-25",
+  "baseCommit": "4adb3db74e310cd519748dc6eef0e4ea03ba9f76",
+  "scope": "local-preparation-not-CI",
+  "node": {
+    "passed": 38,
+    "failed": 0,
+    "skipped": 0,
+    "cancelled": 0,
+    "engineTests": 30,
+    "httpTests": 8
+  },
+  "browser": {
+    "runner": "Python Playwright 1.51.0",
+    "chromiumDesktopPassed": 7,
+    "chromiumMobileEmulationPassed": 7,
+    "webkit": "launch-failed: executable absent",
+    "webkitCasesNotExecuted": 7,
+    "pinnedNodePlaywright": "1.64.1: start blocked, dependencies absent in isolated build"
+  },
+  "sourceBlobs": {
+    "engine.mjs": "8538b83a777fb5bab2eabf9636ba320c7d801097",
+    "engine.test.mjs": "368ce0377918c5ffaff9c84438376c8f88c85848",
+    "catalogue.mjs": "5f2e6278b5909421228bcf65b6e0b591496fcaa4"
+  },
+  "ciVerified": false,
+  "deployed": false,
+  "nowcastsEnabled": false
+}

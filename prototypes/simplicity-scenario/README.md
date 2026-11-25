@@ -1,19 +1,28 @@
-# Isolated hypothetical scenario engine
+# Local hypothetical scenario MVP
 
-First implementation slice: engine.mjs and engine.test.mjs. The prepared UI, loopback server and browser harness are not included in this commit. No production integration or nowcast is implemented.
-
-From the repository root run:
+From the repository root:
 
 ```
-node --test prototypes/simplicity-scenario/engine.test.mjs
+node prototypes/simplicity-scenario/serve.mjs
+node --test prototypes/simplicity-scenario/engine.test.mjs prototypes/simplicity-scenario/serve.test.mjs
 ```
 
-The engine imports the existing runtime catalogue read-only and preserves distinct KiwiSaver/Investment identities. All real-fund reference prices, weights, returns and fees are explicit user assumptions; no provisional disclosure weights are adopted automatically.
+Open http://127.0.0.1:4174. Load synthetic demo, acknowledge the assumptions and calculate. The invented 60/40, +5%/-1%, zero-fee fixture gives 1.026000, not a fund prediction. All 17 real-fund identities are imported from the existing catalogue; their weights, reference prices, dates, returns and fees must be supplied manually. No disclosure extraction is auto-approved.
 
-Returns must be cumulative gross NZD total returns for the entire horizon, already including distributions, FX and hedging effects. Do not apply FX or the same fee twice. Unlisted returns also require explicit assumptions. Starting weights are fixed. The explicit fee compounds using calendarDays/365. No tax, cash flows, rebalancing, intervals or accuracy claims.
+The server binds to loopback and serves only whitelisted prototype assets/catalogue. No account, database, provider, alert or production route is used. Keep exported assumptions private; no persistence or automatic upload occurs. Do not expose this development server publicly.
 
-Input numbers allow six decimal places. Weight aggregation uses BigInt fixed point; fee/output arithmetic uses IEEE-754, not production NAV accounting. Weights must total exactly 100%; missing values are not zero or silently normalised. Unknown identities, dates, return bases and nowcast requests are rejected. Results retain input assumptions and explicit scenario/nowcast-readiness flags.
+Inputs are cumulative gross NZD total returns over the selected horizon, already including distributions, FX and hedging effects. Do not add FX or deduct an embedded fee twice. Unlisted returns require explicit assumptions. Starting weights are fixed; fee compounds over calendarDays/365. No tax, cash flows, rebalancing, intervals or accuracy claims. Six-decimal fixed-point input weighting is followed by IEEE-754 fee/output arithmetic, not production NAV accounting. Unknown values are rejected, not zeroed or normalised. Scenarios never replace official prices; nowcasts remain unavailable.
 
-Local tests on 2026-11-25: 30/30 Node tests passed, zero failed/skipped/cancelled. The separate prepared UI/server had 8 HTTP checks and 7 Chromium UI checks pass using Python Playwright 1.51.0. WebKit's executable was absent and its cases did not execute. These are not results from the repository-pinned Node Playwright 1.64.1 runner, which remains pending.
+## Browser suite
 
-This directory is outside production site assets. No Worker, D1, workflow, manifest, account, provider or alert integration is changed. The next slice is the separately reviewed UI/server/browser harness, followed by the pinned Chromium/WebKit run and current-main integration review. No merge, deployment, notification or activation is implied.
+Reuse existing tests/dashboard dependencies, pinned to @playwright/test 1.64.1:
+
+```
+node tests/dashboard/node_modules/@playwright/test/cli.js test --config prototypes/simplicity-scenario/browser.config.mjs
+```
+
+The config requires both desktop Chromium and mobile WebKit, retries zero. Setup/launch failures must remain failures, not conditional skips. No dependency versions, workflows or release gates are changed.
+
+Local preparation on 2026-11-25: 38/38 Node tests (30 engine, 8 HTTP) passed; JavaScript syntax passed. Equivalent browser cases executed using Python Playwright 1.51.0: 7 desktop-Chromium and 7 mobile-emulated-Chromium cases passed. Mobile Chromium is not WebKit/iOS verification. WebKit launch failed because its binary was absent, leaving 7 cases not executed. The pinned Node runner was attempted but could not start because its dependencies were absent in the isolated build. These are not CI results. See verification.json.
+
+Engine source and tests match commit 4adb3db74e310cd519748dc6eef0e4ea03ba9f76. This remaining batch adds UI, server, HTTP/browser harness and documentation outside site/. No merge, deployment, migration, alert/nowcast activation, project-settings change or PR #6 modification is included. Next: execute the pinned suite including WebKit, then review against current main before separate release decisions.
