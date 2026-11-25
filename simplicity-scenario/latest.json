@@ -1,49 +1,26 @@
 {
   "schemaVersion": 1,
-  "scope": "scenario-browser-suite-and-report-validation",
-  "sourceSha": "c9550fa478c9991a756460ada3b8174e2ce30162",
+  "scope": "scenario-test-job",
+  "sourceSha": "149d17e1d60b26dc3b006594916d0106ce4bef4c",
   "sourceRef": "refs/heads/feat/simplicity-scenario-prototype",
-  "runId": "45531794511",
+  "runId": "45536528350",
   "runAttempt": "1",
-  "runNumber": null,
-  "recordedAt": "2026-11-25T02:18:36.188Z",
-  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/45531794511",
-  "outcome": "passed",
-  "jobResult": null,
+  "runNumber": "2",
+  "recordedAt": "2026-11-25T02:58:42.353Z",
+  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/45536528350",
+  "jobResult": "success",
   "workflowConclusion": null,
+  "outcome": "passed",
   "browserValidation": "passed",
   "passed": 14,
   "failed": 0,
   "skipped": 0,
   "flaky": 0,
-  "projects": {
-    "chromium-desktop": {
-      "passed": 7
-    },
-    "webkit-mobile": {
-      "passed": 7
-    }
-  },
   "evidence": {
-    "kind": "user-supplied-report-and-validator-summary",
-    "independentlyRetrieved": false,
-    "receivedOnLocalDate": "2026-11-25",
-    "playwrightVersionReported": "1.64.1",
-    "scopeLimitation": "Confirms browser cases and report validator only; complete test-job/workflow and artifact-upload conclusions not independently established."
-  },
-  "reportedSummary": {
-    "schemaVersion": 1,
-    "scope": "scenario-browser-report-validation",
-    "sourceSha": "c9550fa478c9991a756460ada3b8174e2ce30162",
-    "sourceRef": "refs/heads/feat/simplicity-scenario-prototype",
-    "runId": "45531794511",
-    "runAttempt": "1",
-    "recordedAt": "2026-11-25T02:18:36.188Z",
-    "outcome": "passed",
-    "passed": 14,
-    "failed": 0,
-    "skipped": 0,
-    "flaky": 0
+    "kind": "trusted-workflow-summary",
+    "summaryAvailable": true,
+    "summarySourceMatched": true,
+    "rawReportStored": false
   },
   "deployed": false,
   "alertsActivated": false
