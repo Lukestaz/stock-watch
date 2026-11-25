@@ -1,34 +1,24 @@
 # Agent-readable automation outcomes
 
-Updated 2026-11-08 NZDT for PR #5. Publication has been verified for application checkpoint b80f918f2e34b8b064802654b87d0f8536d9bee5. The subsequent PR/main CI configuration in this follow-up still requires a fresh run; earlier results do not verify a newer commit.
+## Retrieval contract - 2026-11-25
 
-## Retrieval contract
+Use GitHub get_file_contents for Lukestaz/stock-watch with ref refs/heads/ci-results. Always match source commit/ref, run ID/attempt, scope, timestamps, test-job conclusion and evidence provenance. Missing or older records never establish current success; do not substitute latest-successful for a failed latest attempt.
 
-Use get_file_contents for Lukestaz/stock-watch with ref refs/heads/ci-results.
+Existing verification paths remain simplicity/latest.json, simplicity/latest.md, simplicity/latest-successful.json and simplicity/runs/<run-id>-<attempt>.json. Existing browser records remain simplicity-browser/latest.json and its runs/ records. These historical pointers span their configured trusted branches; they are not live-health feeds.
 
-- simplicity/latest.json and latest.md: newest recorded verification attempt and readable summary.
-- simplicity/latest-successful.json: most recent recorded passing verification attempt, not necessarily the latest attempt.
-- simplicity/runs/<run-id>-<attempt>.json: per-run verification evidence.
-- simplicity-browser/latest.json, latest-successful.json and runs/<run-id>-<attempt>.json: separate browser-job evidence.
+## Scenario prototype records
 
-Check sourceSha/sourceRef or testedCommit/sourceBranch, runId, runAttempt, timestamps, jobResult, outcome and report availability. Latest pointers span trusted pushes to main and feat/simplicity-fund-monitor; they are not branch-specific or live-status feeds. Always match the expected branch and commit. Missing, old or last-successful records do not establish current success.
+Read simplicity-scenario/latest.json, simplicity-scenario/latest.md or simplicity-scenario/runs/<run-id>-<attempt>.json. The seed for 45531794511/1 was saved on ci-results at eef56470f62bd9065ee803fcdafe613637a0efb8 and read back through GitHub. Its original evidence remains user-supplied: 14 browser passes plus passing validation, not an independently established full job/workflow conclusion.
 
-## Verified checkpoint
+The scenario workflow adds a separate publisher only for push events in Lukestaz/stock-watch on feat/simplicity-scenario-prototype. Tests/PRs retain contents:read. Only the publisher receives contents:write/actions:read; it writes bounded JSON/Markdown under simplicity-scenario/ on ci-results. PR and fork events cannot publish. No pull_request_target trigger is used.
 
-The connector retrieved both published results for b80f918. Verification run 42421256771 (number 10, attempt 1) passed 65 Simplicity and 95 account/runtime tests, UI syntax and ten complete public-feed checks. Browser run 42421257083 (number 2, attempt 1) passed 24 cases, 12 per browser, with no failures, flaky or skipped cases.
+Published records distinguish jobResult, browserValidation, outcome and workflowConclusion=null. A successful test job and source-matched passing 14-case validator summary are both required for outcome=passed. Missing/unmatched evidence cannot pass; unknown counts remain null. Newer numeric run IDs/attempts advance latest regardless of success. Permanent run-attempt records are not overwritten. Existing trees, other folders and concurrent writers are preserved through non-force updates with bounded retries. Source/run identity conflicts fail closed.
 
-After PR #5 was opened, GitHub's check-runs API independently confirmed success for both original verification/browser jobs and both publishers. PR adapter, schema, alert-regressions and dashboard browser jobs also reported success for that head; the dashboard PR publisher was skipped as intended. These are job conclusions, not a claim about every possible overall workflow or future commit.
+Reports/traces remain synthetic Actions artifacts with seven-day retention. A publication proves a record was written, not the whole workflow finished successfully. Repository-write permission is job-scoped, not cryptographically restricted to ci-results; trusted-source review remains necessary. Runner/setup/cancellation/permission failures can prevent publication entirely. Check the expected commit before trusting latest.
 
-## Execution and trust boundaries
+No deployment, remote migration, private financial data, provider-secret changes or notification delivery is part of these jobs. Source extraction, live D1, pricing validity and activation remain separate gates.
 
-The follow-up configures both Simplicity-specific workflows for matching pull requests targeting main and matching pushes to main or the feature branch. Push/PR path filters match within each workflow. PR test jobs inherit contents:read; no pull_request_target trigger is used. Only a separate publisher has contents:write and actions:read, guarded to push events in the exact repository and one of those two branch refs. PR events and fork pushes cannot pass that guard.
+## Preserved historical checkpoint
 
-The verification job captures process exit status separately from TAP counts. Missing or inconsistent totals cannot produce a passed record. All four checks and a successful verification job are required. Browser records retain per-project counts and bounded failure details. Raw verification stdout/stderr is not committed; browser screenshots/traces contain synthetic test data only. Artifacts have 30-day retention.
-
-Publishers preserve other result folders, use non-force ref updates with conflict retries, retain write-once run records and prevent older attempts replacing newer latest pointers. Their commits target ci-results, which does not match the workflow branch triggers. Main publication remains pending until a qualifying main push after merge; no merge is authorised by this documentation.
-
-## Limitations
-
-Cancellation, setup/runner failure or publisher permission/API failure can leave no new record. Publication proves that save step ran, not that a later step or the overall workflow finished successfully. Repository write permission is job-scoped, not cryptographically limited to the results branch; trusted source review remains necessary.
-
-No deployment, remote migration, private portfolio data, provider-secret change or alert delivery is part of these reporting jobs. Live D1, rollout bindings, independent fund identity and publication-freshness policy remain separate gates.
+The complete prior automation contract, trust boundaries and verified b80f918 evidence are preserved at:
+https://github.com/Lukestaz/stock-watch/blob/c9550fa478c9991a756460ada3b8174e2ce30162/docs/automation-outcomes.md

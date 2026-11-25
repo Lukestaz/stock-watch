@@ -25,8 +25,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Run deterministic unit, HTTP and report-validator tests
-        run: node --test prototypes/simplicity-scenario/engine.test.mjs prototypes/simplicity-scenario/serve.test.mjs prototypes/simplicity-scenario/verify-browser-report.test.mjs
+      - name: Run deterministic unit, HTTP and reporting tests
+        run: node --test prototypes/simplicity-scenario/engine.test.mjs prototypes/simplicity-scenario/serve.test.mjs prototypes/simplicity-scenario/verify-browser-report.test.mjs prototypes/simplicity-scenario/publisher.test.mjs
       - name: Install existing pinned runner without lifecycle scripts
         run: npm install --prefix tests/dashboard --ignore-scripts --no-audit --no-fund --package-lock=false
       - name: Require the existing exact Playwright version
@@ -51,3 +51,40 @@ jobs:
             scenario-test-results/
           retention-days: 7
           if-no-files-found: warn
+  publish-summary:
+    needs: scenario-tests
+    if: >-
+      always() && github.event_name == 'push' &&
+      github.repository == 'Lukestaz/stock-watch' &&
+      github.ref == 'refs/heads/feat/simplicity-scenario-prototype'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Retrieve this run and attempt's summary
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: scenario-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/scenario-results
+      - name: Publish bounded result, including test failures
+        uses: actions/github-script@v7
+        env:
+          TEST_JOB_RESULT: ${{ needs.scenario-tests.result }}
+          SUMMARY_FILE: ${{ runner.temp }}/scenario-results/scenario-browser-summary.json
+        with:
+          script: |
+            const p = require('./prototypes/simplicity-scenario/publisher.cjs');
+            const summary = p.readSummary(process.env.SUMMARY_FILE);
+            const result = await p.publish({github, context, summary, jobResult:process.env.TEST_JOB_RESULT, runNumber:process.env.GITHUB_RUN_NUMBER});
+            core.info(JSON.stringify(result));
+            if (process.env.TEST_JOB_RESULT === 'success' && (!summary || result.outcome === 'failed')) core.setFailed('No trustworthy browser summary for a successful test job');
