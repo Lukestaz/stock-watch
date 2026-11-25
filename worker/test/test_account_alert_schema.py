@@ -9,7 +9,7 @@ class AccountAlertSchemaTests(unittest.TestCase):
   self.db=sqlite3.connect(':memory:');self.addCleanup(self.db.close)
   self.db.execute('PRAGMA foreign_keys=ON')
   self.db.executescript((MIGRATIONS/'0001_accounts.sql').read_text())
-  self.db.executescript((MIGRATIONS/'0006_account_alerts.sql').read_text())
+  self.db.executescript((MIGRATIONS/'0005_account_alerts.sql').read_text())
   for user,target in [('alice',10),('bob',9)]:
    self.db.execute('INSERT INTO users(id,google_sub) VALUES (?,?)',(user,'sub-'+user))
    self.db.execute('INSERT INTO watchlists(user_id) VALUES (?)',(user,))
