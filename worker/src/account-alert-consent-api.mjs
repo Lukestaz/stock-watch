@@ -25,7 +25,11 @@ export function createAccountAlertConsentApi({enabled=false,enrollmentEnabled=fa
    const rev=v=>Number.isSafeInteger(v)&&v>=0&&v<Number.MAX_SAFE_INTEGER;
    if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).length!==keys.length||!keys.every(k=>Object.hasOwn(body,k))||typeof body.symbol!=='string'||!/^[A-Z0-9][A-Z0-9.\-]{0,14}$/.test(body.symbol)||typeof body.enabled!=='boolean'||!rev(body.expectedWatchlistRevision)||!rev(body.expectedTargetRevision)||(body.expectedDestinationRevision!==null&&!rev(body.expectedDestinationRevision))||(body.enabled&&!(body.expectedDestinationRevision>0)))return reply({error:'Invalid consent request'},400);
    if(body.enabled&&enrollmentEnabled!==true)return reply({error:'Alert enrollment unavailable'},409);
-   const result=await store.setEmailConsent({...body,userId:principal.userId,now:clock()});return result?reply(result,200,principal.userId):reply({error:'Watchlist or verified destination changed; reload before saving'},409);
+   const input={...body,userId:principal.userId,now:clock()};const result=await store.setEmailConsent(input);
+   if(result)return reply(result,200,principal.userId);
+   if(body.enabled&&typeof store.emailConsentRefusal==='function'){let why=null;try{why=await store.emailConsentRefusal(input);}catch{}
+    if(why==='capacity')return reply({error:'Email alerts are at capacity',code:'capacity-full'},409);}
+   return reply({error:'Watchlist or verified destination changed; reload before saving'},409);
   }catch{return reply({error:'Alert consent unavailable'},503);}
  };
 }

@@ -54,6 +54,18 @@ export function createD1AccountAlertStore(db,{enrollmentEnabled=false,evaluation
    ]);
    return r[0].results.length?{revision:r[0].results[0].revision,enabled}:null;
   },
+  async emailConsentRefusal({userId,symbol:stock,expectedWatchlistRevision,expectedTargetRevision,expectedDestinationRevision,enabled}={}){
+   if(enabled!==true||!user(userId)||!symbol(stock)||!revision(expectedWatchlistRevision)||!revision(expectedTargetRevision)||!revision(expectedDestinationRevision)||expectedDestinationRevision<1)return 'stale';
+   const row=(await batch([stmt(`SELECT
+    (SELECT count(*) FROM watchlists WHERE user_id=? AND revision=?) AS watchlist,
+    (SELECT count(*) FROM watchlist_entries WHERE user_id=? AND symbol=? AND target_revision=?) AS target,
+    (SELECT count(*) FROM alert_destinations d WHERE d.user_id=? AND d.channel='email' AND d.revision=? AND d.verified_at IS NOT NULL
+      AND (d.enabled=1 OR NOT EXISTS (SELECT 1 FROM watchlist_entries e WHERE e.user_id=d.user_id AND e.symbol<>? AND e.email_enabled=1))) AS destination,
+    (SELECT count(*) FROM watchlist_entries WHERE symbol=? AND email_enabled=1) AS held,
+    (SELECT count(DISTINCT symbol) FROM watchlist_entries WHERE email_enabled=1) AS used`,
+    [userId,expectedWatchlistRevision,userId,stock,expectedTargetRevision,userId,expectedDestinationRevision,stock,stock])]))[0].results[0];
+   return row&&row.watchlist===1&&row.target===1&&row.destination===1&&row.held===0&&row.used>=ACCOUNT_EMAIL_SYMBOL_LIMIT?'capacity':'stale';
+  },
   async invalidatePending(now){
    if(evaluationEnabled!==true)return 0;if(!timestamp(now))throw Error('Invalid evaluation time');
    return (await batch([invalidate(now)]))[0].results.length;
