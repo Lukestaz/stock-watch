@@ -2,7 +2,7 @@
 
 Updated 2026-11-08 NZDT for PR #5: https://github.com/Lukestaz/stock-watch/pull/5. Source branch: feat/simplicity-fund-monitor. Last verified application checkpoint: b80f918f2e34b8b064802654b87d0f8536d9bee5. The subsequent CI/docs follow-up is not covered by those earlier results until its own checks complete.
 
-Updated 2026-11-26 NZDT on branch fix/simplicity-cloudfront-feeds (from main 20529aa) for the feed source change described in the next section. That branch is not merged, deployed or enabled, and its own CI result is not recorded in this document.
+Updated 2026-11-26 NZDT on branch fix/simplicity-cloudfront-feeds (from main 20529aa, PR #8) for the feed source change described in the next section. That branch is not merged, deployed or enabled. Its check results at code head f33b0d5 are recorded in the next section.
 
 ## 2026-11-26 feed source change (proposed, not merged)
 
@@ -14,6 +14,7 @@ Updated 2026-11-26 NZDT on branch fix/simplicity-cloudfront-feeds (from main 205
 - Nine files were readable to their last row. Latest observation dates seen: highgrowth 2026-11-24, defensive 2026-11-24, nzbond 2026-11-24, invnzcash 2026-11-24, default 2026-11-23, invhighgrowth 2026-11-23, invhedgedglobalshare 2026-11-23, invunhedgedglobalshare 2026-11-23, invhedgedglobalbond 2026-11-23. Six files (growth, balanced, conservative, invgrowth, invbalanced, invconservative) start in 2016 or 2017 and were cut off by the tool's output limit, so their latest dates are unseen. nzshare was not read.
 - For the series where both were retrieved, the opening prices of each new file matched the previous endpoint's response, and later overlapping values matched for High Growth, Default, Defensive and Investment High Growth. This shows continuity of data; it is not identity verification.
 - The CSV layout (header Date,Price, DD-MM-YYYY dates, a blank line after each group of six rows) is accepted by the existing parser, which skips blank lines. This is shown by reading the parser and by a new test.
+- Check results for PR #8 at code head f33b0d5 (started 2026-11-26 09:42 UTC, 22:42 NZDT): the `verify` job (Simplicity feed diagnostics, run 45794459991, job 139821437813) concluded success in 22 seconds, `alert-regressions` concluded success, and `publish-summary` was skipped, as expected for a pull request. The PR reported a clean mergeable state. Source: GitHub check runs and PR data read through the connector. The job log was not read. From the script logic, a successful job implies that all sixteen feed reports were present, each returned HTTP 200 and parsed, none was future-dated, and the High Growth launch-price checks matched. The test counts and the per-series observation dates from Actions were not seen.
 
 ### Series-to-file mapping (16 series)
 
@@ -43,7 +44,7 @@ All files are under https://d1g0vrcwq8cgqg.cloudfront.net/unit-prices/. File nam
 - The fetcher accepts only the exact origin above, a path of the form /unit-prices/<lowercase letters>.csv, and no query string, credentials or fragment. Redirect refusal, the size cap, the timeout and the HTML/JSON rejection are unchanged.
 - The old simplicity.kiwi endpoint is no longer accepted. It is recorded here as superseded and is not kept as a silent fallback.
 - The feed list has sixteen entries instead of ten, and the feeds diagnostic compares its report count with that list instead of a fixed ten. Adding the six Investment entries makes those series requestable at /api/v1/fund when SIMPLICITY_READ_ONLY is on. Monitoring and alerts stay disabled for all of them.
-- The feed evidence entries record downloadStatus as unverified until an Actions run shows otherwise. The earlier 2026-11-07 evidence is not reused for the new URLs.
+- The feed evidence entries record downloadStatus as unverified until an Actions run shows otherwise. The earlier 2026-11-07 evidence is not reused for the new URLs, and the entries have not been changed to a passed status on the strength of the check result above.
 
 ### Inferences, unresolved questions and limits
 
@@ -52,7 +53,7 @@ All files are under https://d1g0vrcwq8cgqg.cloudfront.net/unit-prices/. File nam
 - Latest observation dates differ across the files seen (2026-11-24 for four, 2026-11-23 for five). No publication schedule is assumed and freshness stays unchecked unless an expected date is supplied.
 - Content hashes were not recorded: the files exceed what the retrieval tool returns and the analysis sandbox has no network access.
 - Fund identity is unverified for every series. The 2026 annual reports list 31 March 2026 unit prices, which could be used for an independent check; that has not been done.
-- The live fetch of all sixteen files from GitHub Actions has not been observed. Until a verification run on this branch reports sixteen HTTP 200 parses, the new URLs are unconfirmed from CI.
+- The live fetch of all sixteen files from GitHub Actions is inferred from the successful verify job above, not read from its log. The per-series observation dates in Actions, and the test counts, remain unseen.
 
 ## Outcome and review
 
@@ -88,7 +89,7 @@ The ten downloaded feeds at that checkpoint are KiwiSaver High Growth, Growth, B
 
 - Publication freshness is unchecked unless an expected date is explicitly supplied. No provider publication schedule or holiday policy is established; cache TTL does not establish observation freshness.
 - Independent feed identity verification is incomplete. Parsing success and a shared launch price cannot enable alerts.
-- Investment Homes and Income has no download link (owner-reported 2026-11-26). The six other previously unresolved Investment mappings now have owner-supplied links, which have not yet been exercised in Actions. Catalogue presence is not endpoint verification.
+- Investment Homes and Income has no download link (owner-reported 2026-11-26). The six other previously unresolved Investment mappings now have owner-supplied links; the PR #8 verify job succeeded with them (see the 2026-11-26 section), but that is inferred from the job conclusion and the log was not read. Catalogue presence is not endpoint verification.
 - Live D1 SQL, migration application, cold/warm API reads, durable remote coordination and deployment bindings remain unverified. Do not assume a preview DB is isolated or reuse production silently.
 - Personal positions, re-entry rules, persistent fund-alert delivery and scheduled fund monitoring are not implemented. Earlier illustrative thresholds were not adopted.
 
