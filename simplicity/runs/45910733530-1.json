@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "scope": "simplicity-verification-job",
+  "repository": "Lukestaz/stock-watch",
+  "sourceSha": "ca948d28e35064861addcfec177d2284c17a870b",
+  "sourceRef": "refs/heads/main",
+  "runId": "45910733530",
+  "runNumber": "41",
+  "runAttempt": "1",
+  "recordedAt": "2026-11-26T23:25:07.586Z",
+  "jobResult": "success",
+  "checks": {
+    "simplicity": {
+      "schemaVersion": 1,
+      "name": "simplicity",
+      "startedAt": "2026-11-26T23:24:18.181Z",
+      "completedAt": "2026-11-26T23:24:19.977Z",
+      "processExitCode": 0,
+      "status": "passed",
+      "counts": {
+        "tests": 82,
+        "pass": 82,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      }
+    },
+    "accounts": {
+      "schemaVersion": 1,
+      "name": "accounts",
+      "startedAt": "2026-11-26T23:24:20.031Z",
+      "completedAt": "2026-11-26T23:24:44.341Z",
+      "processExitCode": 0,
+      "status": "passed",
+      "counts": {
+        "tests": 299,
+        "pass": 299,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      }
+    },
+    "ui": {
+      "schemaVersion": 1,
+      "name": "ui",
+      "startedAt": "2026-11-26T23:24:44.420Z",
+      "completedAt": "2026-11-26T23:24:44.443Z",
+      "processExitCode": 0,
+      "status": "passed"
+    },
+    "feeds": {
+      "schemaVersion": 1,
+      "name": "feeds",
+      "startedAt": "2026-11-26T23:24:44.482Z",
+      "completedAt": "2026-11-26T23:24:57.139Z",
+      "processExitCode": 0,
+      "status": "passed",
+      "feeds": [
+        {
+          "seriesId": "simplicity:kiwisaver:high-growth",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-25"
+        },
+        {
+          "seriesId": "simplicity:kiwisaver:growth",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-25"
+        },
+        {
+          "seriesId": "simplicity:kiwisaver:balanced",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-25"
+        },
+        {
+          "seriesId": "simplicity:kiwisaver:default",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-25"
+        },
+        {
+          "seriesId": "simplicity:kiwisaver:conservative",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-25"
+        },
+        {
+          "seriesId": "simplicity:kiwisaver:defensive",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-25"
+        },
+        {
+          "seriesId": "simplicity:investment:high-growth",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-25"
+        },
+        {
+          "seriesId": "simplicity:investment:growth",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-25"
+        },
+        {
+          "seriesId": "simplicity:investment:balanced",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-25"
+        },
+        {
+          "seriesId": "simplicity:investment:conservative",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-25"
+        },
+        {
+          "seriesId": "simplicity:investment:nz-share",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-25"
+        },
+        {
+          "seriesId": "simplicity:investment:nz-bond",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-25"
+        },
+        {
+          "seriesId": "simplicity:investment:nz-cash",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-25"
+        },
+        {
+          "seriesId": "simplicity:investment:hedged-global-share",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-25"
+        },
+        {
+          "seriesId": "simplicity:investment:unhedged-global-share",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-25"
+        },
+        {
+          "seriesId": "simplicity:investment:hedged-global-bond",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-25"
+        }
+      ]
+    }
+  },
+  "outcome": "passed",
+  "deployed": false,
+  "remoteMigrationApplied": false,
+  "alertsActivated": false,
+  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/45910733530"
+}
