@@ -11,8 +11,11 @@ export function createEmailConsentClient({fetcher=globalThis.fetch}={}){
   const timer=setTimeout(()=>controller.abort(),15000);
   try{
    const response=await fetcher(path,{method,credentials:'same-origin',cache:'no-store',redirect:'error',signal:controller.signal,headers:{Accept:'application/json',...(method==='PUT'?{'Content-Type':'application/json','X-Watchlist-Account':state.account}:{})},...(body?{body:JSON.stringify(body)}:{})});
-   if(version!==generation)return {kind:'stale'};
-   if(!response.ok){if([401,409].includes(response.status))state=null;return {kind:response.status===401?'signed-out':response.status===409?'conflict':response.status===429?'rate-limited':'unavailable'};}
+   if(!response.ok){
+    const failure=response.status===409?await response.json().catch(()=>null):null;
+    if(version!==generation)return {kind:'stale'};
+    if(method==='PUT'&&failure?.code==='capacity-full')return {kind:'capacity-full'};
+    if([401,409].includes(response.status))state=null;return {kind:response.status===401?'signed-out':response.status===409?'conflict':response.status===429?'rate-limited':'unavailable'};}
    const data=await response.json();if(version!==generation)return {kind:'stale'};
    if(method==='GET'){
     const account=response.headers.get('X-Watchlist-Account');
@@ -46,7 +49,7 @@ export function mountFriendsEmailSettings({root,session,enrollmentAvailable=fals
  const send=button('Send verification code'),verify=button('Verify email'),refresh=button('Refresh alert settings'),status=make('p'),list=make('div');status.setAttribute('role','status');status.setAttribute('aria-live','polite');
  panel.append(title,note,emailLabel,send,tokenLabel,verify,refresh,status,list);root.append(panel);
  let signedIn=false,busy=false,version=0,canEnroll=enrollmentAvailable===true;
- const messages={loaded:'Choose each stock’s email setting. Opt-in waits for a new delayed observation.',saved:'Saved. Reload the watchlist editor before editing targets.',sent:'Check your inbox for the latest verification code.',verified:'Email verified. Choose stocks below; alerts are not enabled automatically.',conflict:'Account, target or settings changed. Refresh before saving.','account-changed':'Account changed. Check account sign-in before continuing.','paused-selection':'Turn off the other paused stock selections before enabling or resuming this stock.','signed-out':'Session expired. Check account sign-in.','rate-limited':'Too many requests. Wait before trying again.',invalid:'Check your email address or verification code.',unavailable:'Email alerts unavailable. Check your inbox before requesting another code.'};
+ const messages={loaded:'Choose each stock’s email setting. Opt-in waits for a new delayed observation.',saved:'Saved. Reload the watchlist editor before editing targets.',sent:'Check your inbox for the latest verification code.',verified:'Email verified. Choose stocks below; alerts are not enabled automatically.',conflict:'Account, target or settings changed. Refresh before saving.','account-changed':'Account changed. Check account sign-in before continuing.','paused-selection':'Turn off the other paused stock selections before enabling or resuming this stock.','capacity-full':'Email alerts are at capacity right now, so this stock was not turned on. Your settings are unchanged; try again later.','signed-out':'Session expired. Check account sign-in.','rate-limited':'Too many requests. Wait before trying again.',invalid:'Check your email address or verification code.',unavailable:'Email alerts unavailable. Check your inbox before requesting another code.'};
  const unsaved=()=>typeof session.hasUnsaved==='function'&&session.hasUnsaved();
  function render(){
   for(const n of [email,token,send,verify,refresh])n.disabled=!signedIn||busy;

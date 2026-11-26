@@ -59,3 +59,21 @@ test('a rolled-back opt-in does not consume the last symbol reservation',async t
 test('opt-out is allowed even for an already over-capacity database',async t=>{
  const f=await fixture(t,21);assert.deepEqual(await f.store.setEmailConsent(consent('u1','S00',false)),{revision:1,enabled:false});assert.equal(await f.count(),20);
 });
+test('refusal diagnosis reports capacity for a new symbol at the limit without writing',async t=>{
+ const f=await fixture(t),before=await f.snapshot();assert.equal(await f.store.setEmailConsent(consent()),null);
+ assert.equal(await f.store.emailConsentRefusal(consent()),'capacity');assert.deepEqual(await f.snapshot(),before);
+});
+test('stale revisions are never reported as capacity, even at the limit',async t=>{
+ const f=await fixture(t);for(const input of [consent('u1','NEW1',true,7),{...consent(),expectedTargetRevision:9},{...consent(),expectedDestinationRevision:9}])assert.equal(await f.store.emailConsentRefusal(input),'stale');
+});
+test('an already reserved symbol is never reported as capacity',async t=>{
+ const f=await fixture(t);assert.equal(await f.store.emailConsentRefusal(consent('u2','S00',true,9)),'stale');assert.equal(await f.store.emailConsentRefusal(consent('u2','S00')),'stale');
+});
+test('an unverified destination is stale, not capacity',async t=>{
+ const f=await fixture(t);assert.equal(await f.store.emailConsentRefusal(consent('u2','NEW2')),'capacity');
+ await query(f.db,"UPDATE alert_destinations SET verified_at=NULL WHERE user_id='u2'");assert.equal(await f.store.emailConsentRefusal(consent('u2','NEW2')),'stale');
+});
+test('below the limit, opt-outs and malformed input are never capacity',async t=>{
+ const f=await fixture(t,19);assert.equal(await f.store.emailConsentRefusal(consent()),'stale');
+ assert.equal(await f.store.emailConsentRefusal({...consent(),enabled:false}),'stale');assert.equal(await f.store.emailConsentRefusal({}),'stale');
+});

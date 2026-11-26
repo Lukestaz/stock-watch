@@ -6,6 +6,7 @@ Checkpoint: 2026-11-26 NZDT. This is a repository handover, not proof of product
 
 - Draft PR #4 (`feature/multi-user-alerts`), head `06cd935`: the original work. Unmerged and unchanged.
 - Draft PR #7 (`feat/friends-alerts-integration` into `main`): integration of PR #4 onto current main. Branch created from main `8b326d2`; the PR base later reported `20529aa`. Last code head before this document: `9aaf5b9`.
+- Capacity-full feedback: API and store changes are commit `692a6dc` (CI ran with no regressions, but nothing exercised the new method). The client change, new tests and this edit follow in a later commit whose CI result is not recorded here.
 
 ## Observed facts
 
@@ -14,16 +15,17 @@ Checkpoint: 2026-11-26 NZDT. This is a repository handover, not proof of product
 | Production D1 `d1_migrations` lists 11 names: `0001_accounts`, `0002_write_token`, `0003_identity`, `0004_price_cache`, `0005_account_alerts`, `0005_simplicity`, `0006_alert_email_challenges`, `0007_verification_mail_budget`, `0008_verification_requests`, `0009_account_alert_monitors`, `0010_account_email_dispatch`. | Output of the `Inspect production D1 schema` workflow (metadata only) run on main at `8b326d2`, supplied by the repository owner on 2026-11-26. I did not run it myself. |
 | Production has the friends tables and the added delivery and reservation columns (`claim_token`, `claim_until`, `dispatch_token`, `send_started_at`, `last_error_category`, `consent_revision`, `purpose`). | Same report. |
 | This branch's `worker/migrations` has the same 11 filenames. The six friends migrations are byte-identical (git blob SHA) to PR #4's. | GitHub connector directory listing compared with the report. |
-| Friends `worker/src` modules, the three UI files, all 18 friends test files, the 12 friends workflows and the staging build script match PR #4 by git blob SHA. | GitHub connector, compared after each push. |
+| Friends `worker/src` modules, the three UI files, all 18 friends test files, the 12 friends workflows and the staging build script matched PR #4 by git blob SHA when compared. `account-alert-consent-api.mjs`, `account-alert-store.mjs` and `site/account-friends-email.mjs` have since been edited for capacity-full feedback and no longer match. | GitHub connector, compared after each push. |
 | `worker/src/account-runtime.mjs` and `worker/test/account-runtime-friends-integration.test.mjs` are hand-written and not copies. | Reviewed from the commit diff `a849bac`. |
-| CI on PR #7 at head `9aaf5b9`: 16 checks succeeded, 1 failed (`verify`), 2 `publish-summary` jobs were skipped (they run only on pushes to main). | GitHub check runs read through the connector on 2026-11-26. |
-| `verify` belongs to "Simplicity feed diagnostics". Its live-feed step reported HTTP 404 HTML for 9 of 10 feeds and a timeout for the tenth. | Step output supplied by the repository owner. Other `verify` steps were not inspected. The owner states the feed is being fixed at source (owner-supplied, not independently verified). |
+| CI on PR #7 at head `9aaf5b9`: 16 checks succeeded, 1 failed (`verify`), 2 `publish-summary` jobs were skipped (they run only on pushes to main). At head `692a6dc` the counts were the same: 16 succeeded, 1 failed (`verify`), 2 skipped. | GitHub check runs read through the connector on 2026-11-26. The check-run list does not name the commit; `692a6dc` is inferred from the PR head and run start times. |
+| `verify` belongs to "Simplicity feed diagnostics". Its live-feed step reported HTTP 404 HTML for 9 of 10 feeds and a timeout for the tenth. | Step output supplied by the repository owner for the earlier run. Other `verify` steps were not inspected, and the log for the `692a6dc` run was not read. The owner states the feed is being fixed at source (owner-supplied, not independently verified). |
 | `verify` also failed on draft PR #6 on 2026-11-24, before the integration work. | GitHub check runs. |
 
 ## What is implemented (committed, not deployed)
 
 - Email destination registration and one-time verification, with account-bound sessions, hashed challenges, request admission limits and a shared mail budget.
-- Per-stock email opt-in and opt-out with revision checks, an enrolment gate, a paused-selection guard and a 20 distinct symbol capacity limit.
+- Per-stock email opt-in and opt-out with revision checks, an enrolment gate, a paused-selection guard and a 20 distinct symbol email-alert limit shared across all accounts.
+- A capacity-full response (HTTP 409 with code `capacity-full`) and panel message, distinct from the generic conflict. The new store method is read-only and reveals no counts or symbols.
 - Alert evaluation from delayed one-minute bars (15 to 60 minutes old), an account-scoped outbox with leases, final eligibility rechecks and recorded outcomes, and a Gmail SMTP transport.
 - A scheduled handler and delayed market source, wired through the account runtime behind default-off flags.
 - Account-panel UI that mounts only when `/api/health` reports `friendsAlerts.verificationReady === true`.
@@ -37,7 +39,7 @@ Tests use local SQLite with the full migration chain, fake SMTP sockets, seeded 
 | State | Status |
 |---|---|
 | Committed | Yes, on PR #7's branch. |
-| CI-tested | Partly: friends workflows pass; `verify` fails on the external feed step. |
+| CI-tested | Partly: friends workflows pass; `verify` fails on the external feed step. The capacity-full tests have no recorded CI result yet. |
 | Merged | No. |
 | Deployed | No code from this work. |
 | Enabled | Not as far as this repository shows. The friends flags default off and are not set in repository configuration. Deployed bindings were not inspected. |
@@ -54,14 +56,16 @@ Tests use local SQLite with the full migration chain, fake SMTP sockets, seeded 
 - The friends layer stays off unless `ACCOUNTS_ENABLED` and `FRIENDS_ALERTS_ENABLED` are exactly `'true'`. Scheduling and enrolment need their own flags.
 - Email is the only account channel. WhatsApp account delivery is not available.
 - A failing check is not weakened or skipped to obtain a pass.
+- The capacity message must not imply an account's own count, because the limit counts distinct symbols across all accounts.
 
 ## Known gaps
 
-- No dedicated capacity-full response or UI message. A refusal at the 20 symbol limit still appears as a generic conflict.
-- The original PR #4 worker documents are not yet copied to this branch. Some describe earlier states as unwired; this document supersedes them where they conflict.
+- Capacity-full feedback is implemented but not yet CI-verified. The diagnosis runs after a failed write, so a slot freed in between can produce the generic conflict message instead.
+- The original PR #4 worker documents are not yet copied to this branch. Some describe earlier states as unwired, and `SYMBOL_CAPACITY.md` describes capacity refusals as generic conflicts; this document supersedes them where they conflict.
 - `migrate-production-friends-schema.yml` on main asserts a baseline of only migrations `0001` to `0004` and pins an old revision. Production already has all 11, so its preflight would fail. It is stale and should be retired in a separate change.
 - Event and outbox history retention policy is not defined.
 - Gmail and market-data usage is not counted against legacy jobs sharing the same accounts.
+- The PR #7 description is out of date: it says no CI result exists and that capacity-full is not built.
 
 ## Activation gates
 
@@ -76,7 +80,8 @@ Each needs separate, action-specific approval. Passing CI is not enough.
 
 ## Next steps
 
-1. Build the capacity-full response and message, with tests.
+1. Check CI for the capacity-full change and its tests, and fix any failures.
 2. Copy the PR #4 documents or reference them from this one.
 3. Link this document from `AGENTS.md`.
-4. Retire the stale production migration workflow separately.
+4. Update the PR #7 description.
+5. Retire the stale production migration workflow separately.
