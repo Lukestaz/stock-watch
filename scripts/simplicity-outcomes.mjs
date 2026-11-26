@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { DOWNLOAD_EVIDENCE } from '../worker/src/simplicity-feed-health.mjs';
 
 export const CHECKS = ['simplicity', 'accounts', 'ui', 'feeds'];
 export function tapCounts(text) {
@@ -38,7 +39,7 @@ function collect(kind, dir) {
   if (kind === 'feeds') {
     try {
       const data = JSON.parse(run.stdout);
-      if (data.schemaVersion !== 1 || !Array.isArray(data.reports) || data.reports.length !== 10) throw Error('Missing feed reports');
+      if (data.schemaVersion !== 1 || !Array.isArray(data.reports) || data.reports.length !== DOWNLOAD_EVIDENCE.length) throw Error('Missing feed reports');
       record.feeds = data.reports.map(r => ({ seriesId: String(r.seriesId).slice(0, 100), httpStatus: Number.isInteger(r.status) ? r.status : null, parsePassed: r.parsePassed === true, asOfDate: /^\d{4}-\d{2}-\d{2}$/.test(r.asOfDate || '') ? r.asOfDate : null }));
       if (record.feeds.some(r => r.httpStatus !== 200 || !r.parsePassed)) record.status = 'failed';
     } catch { record.status = run.status === 0 ? 'unknown' : 'failed'; }

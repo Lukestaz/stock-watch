@@ -1,9 +1,14 @@
 import { parseSimplicityHistory } from './simplicity-history.mjs';
 
+// Only the published unit-price CSV host and path shape are accepted. File names come from the explicit
+// mapping in simplicity-feed-health.mjs and are never derived from fund names.
+const FEED_ORIGIN = 'https://d1g0vrcwq8cgqg.cloudfront.net';
+const FEED_PATH = /^\/unit-prices\/[a-z]+\.csv$/;
+
 export async function fetchSimplicityHistory(fund, { fetchImpl = (input, init) => globalThis.fetch(input, init), now = () => new Date(), timeoutMs = 10000 } = {}) {
   if (fund?.verificationStatus !== 'verified' || !fund.feedUrl) throw new Error('Verified feed mapping required');
   const url = new URL(fund.feedUrl);
-  if (url.origin !== 'https://simplicity.kiwi' || url.pathname !== '/api/download_prices' || url.username || url.password || url.hash || !url.searchParams.get('fund_name')) throw new Error('Invalid feed URL');
+  if (url.origin !== FEED_ORIGIN || !FEED_PATH.test(url.pathname) || url.username || url.password || url.hash || url.search) throw new Error('Invalid feed URL');
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 30000) throw new Error('Invalid timeout');
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);

@@ -1,16 +1,24 @@
+const FEED_ORIGIN = 'https://d1g0vrcwq8cgqg.cloudfront.net';
+
+// Explicit series-to-file mapping from the owner-supplied "Download unit price history" links.
+// File names are irregular (for example invnzcash but nzbond) and must never be derived from fund names.
 const candidates = [
-  ['kiwisaver', 'high-growth', 'High Growth'], ['kiwisaver', 'growth', 'Growth'],
-  ['kiwisaver', 'balanced', 'Balanced'], ['kiwisaver', 'default', 'Default'],
-  ['kiwisaver', 'conservative', 'Conservative'], ['kiwisaver', 'defensive', 'Defensive'],
-  ['investment', 'high-growth', 'INVHigh Growth'], ['investment', 'growth', 'INVGrowth'],
-  ['investment', 'balanced', 'INVBalanced'], ['investment', 'conservative', 'INVConservative']
+  ['kiwisaver', 'high-growth', 'highgrowth'], ['kiwisaver', 'growth', 'growth'],
+  ['kiwisaver', 'balanced', 'balanced'], ['kiwisaver', 'default', 'default'],
+  ['kiwisaver', 'conservative', 'conservative'], ['kiwisaver', 'defensive', 'defensive'],
+  ['investment', 'high-growth', 'invhighgrowth'], ['investment', 'growth', 'invgrowth'],
+  ['investment', 'balanced', 'invbalanced'], ['investment', 'conservative', 'invconservative'],
+  ['investment', 'nz-share', 'nzshare'], ['investment', 'nz-bond', 'nzbond'],
+  ['investment', 'nz-cash', 'invnzcash'], ['investment', 'hedged-global-share', 'invhedgedglobalshare'],
+  ['investment', 'unhedged-global-share', 'invunhedgedglobalshare'], ['investment', 'hedged-global-bond', 'invhedgedglobalbond']
 ];
 
-export const DOWNLOAD_EVIDENCE = Object.freeze(candidates.map(([scheme, slug, parameter]) => Object.freeze({
+export const DOWNLOAD_EVIDENCE = Object.freeze(candidates.map(([scheme, slug, file]) => Object.freeze({
   seriesId: `simplicity:${scheme}:${slug}`,
-  feedUrl: `https://simplicity.kiwi/api/download_prices?fund_name=${encodeURIComponent(parameter)}`,
-  downloadStatus: 'passed', evidenceSource: 'user-supplied Actions output',
-  evidenceDate: '2026-11-07', observedLatestDate: '2026-11-04',
+  feedUrl: `${FEED_ORIGIN}/unit-prices/${file}.csv`,
+  downloadStatus: 'unverified',
+  evidenceSource: 'owner-supplied links under the Simplicity "Download unit price history" buttons',
+  evidenceDate: '2026-11-26', observedLatestDate: null,
   identityVerified: false, monitoringEnabled: false, alertsEnabled: false
 })));
 
