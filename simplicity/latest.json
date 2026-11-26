@@ -2,24 +2,24 @@
   "schemaVersion": 1,
   "scope": "simplicity-verification-job",
   "repository": "Lukestaz/stock-watch",
-  "sourceSha": "95d31b2e7b640b66dceaee0f78f3086f06274122",
+  "sourceSha": "30aa07647192f95b52ec27195cbf16921b74cf85",
   "sourceRef": "refs/heads/main",
-  "runId": "44380110002",
-  "runNumber": "19",
+  "runId": "45797930539",
+  "runNumber": "36",
   "runAttempt": "1",
-  "recordedAt": "2026-11-18T19:24:28.512Z",
+  "recordedAt": "2026-11-26T10:05:23.897Z",
   "jobResult": "success",
   "checks": {
     "simplicity": {
       "schemaVersion": 1,
       "name": "simplicity",
-      "startedAt": "2026-11-18T19:24:05.927Z",
-      "completedAt": "2026-11-18T19:24:07.786Z",
+      "startedAt": "2026-11-26T10:05:06.215Z",
+      "completedAt": "2026-11-26T10:05:08.729Z",
       "processExitCode": 0,
       "status": "passed",
       "counts": {
-        "tests": 79,
-        "pass": 79,
+        "tests": 82,
+        "pass": 82,
         "fail": 0,
         "cancelled": 0,
         "skipped": 0
@@ -28,8 +28,8 @@
     "accounts": {
       "schemaVersion": 1,
       "name": "accounts",
-      "startedAt": "2026-11-18T19:24:07.841Z",
-      "completedAt": "2026-11-18T19:24:12.407Z",
+      "startedAt": "2026-11-26T10:05:08.777Z",
+      "completedAt": "2026-11-26T10:05:11.740Z",
       "processExitCode": 0,
       "status": "passed",
       "counts": {
@@ -43,16 +43,16 @@
     "ui": {
       "schemaVersion": 1,
       "name": "ui",
-      "startedAt": "2026-11-18T19:24:12.461Z",
-      "completedAt": "2026-11-18T19:24:12.484Z",
+      "startedAt": "2026-11-26T10:05:11.790Z",
+      "completedAt": "2026-11-26T10:05:11.811Z",
       "processExitCode": 0,
       "status": "passed"
     },
     "feeds": {
       "schemaVersion": 1,
       "name": "feeds",
-      "startedAt": "2026-11-18T19:24:12.525Z",
-      "completedAt": "2026-11-18T19:24:16.673Z",
+      "startedAt": "2026-11-26T10:05:11.845Z",
+      "completedAt": "2026-11-26T10:05:12.469Z",
       "processExitCode": 0,
       "status": "passed",
       "feeds": [
@@ -60,61 +60,97 @@
           "seriesId": "simplicity:kiwisaver:high-growth",
           "httpStatus": 200,
           "parsePassed": true,
-          "asOfDate": "2026-11-16"
+          "asOfDate": "2026-11-24"
         },
         {
           "seriesId": "simplicity:kiwisaver:growth",
           "httpStatus": 200,
           "parsePassed": true,
-          "asOfDate": "2026-11-16"
+          "asOfDate": "2026-11-24"
         },
         {
           "seriesId": "simplicity:kiwisaver:balanced",
           "httpStatus": 200,
           "parsePassed": true,
-          "asOfDate": "2026-11-16"
+          "asOfDate": "2026-11-24"
         },
         {
           "seriesId": "simplicity:kiwisaver:default",
           "httpStatus": 200,
           "parsePassed": true,
-          "asOfDate": "2026-11-16"
+          "asOfDate": "2026-11-24"
         },
         {
           "seriesId": "simplicity:kiwisaver:conservative",
           "httpStatus": 200,
           "parsePassed": true,
-          "asOfDate": "2026-11-16"
+          "asOfDate": "2026-11-24"
         },
         {
           "seriesId": "simplicity:kiwisaver:defensive",
           "httpStatus": 200,
           "parsePassed": true,
-          "asOfDate": "2026-11-16"
+          "asOfDate": "2026-11-24"
         },
         {
           "seriesId": "simplicity:investment:high-growth",
           "httpStatus": 200,
           "parsePassed": true,
-          "asOfDate": "2026-11-16"
+          "asOfDate": "2026-11-24"
         },
         {
           "seriesId": "simplicity:investment:growth",
           "httpStatus": 200,
           "parsePassed": true,
-          "asOfDate": "2026-11-16"
+          "asOfDate": "2026-11-24"
         },
         {
           "seriesId": "simplicity:investment:balanced",
           "httpStatus": 200,
           "parsePassed": true,
-          "asOfDate": "2026-11-16"
+          "asOfDate": "2026-11-24"
         },
         {
           "seriesId": "simplicity:investment:conservative",
           "httpStatus": 200,
           "parsePassed": true,
-          "asOfDate": "2026-11-16"
+          "asOfDate": "2026-11-24"
+        },
+        {
+          "seriesId": "simplicity:investment:nz-share",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-24"
+        },
+        {
+          "seriesId": "simplicity:investment:nz-bond",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-24"
+        },
+        {
+          "seriesId": "simplicity:investment:nz-cash",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-24"
+        },
+        {
+          "seriesId": "simplicity:investment:hedged-global-share",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-24"
+        },
+        {
+          "seriesId": "simplicity:investment:unhedged-global-share",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-24"
+        },
+        {
+          "seriesId": "simplicity:investment:hedged-global-bond",
+          "httpStatus": 200,
+          "parsePassed": true,
+          "asOfDate": "2026-11-24"
         }
       ]
     }
@@ -123,5 +159,5 @@
   "deployed": false,
   "remoteMigrationApplied": false,
   "alertsActivated": false,
-  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/44380110002"
+  "runUrl": "https://github.com/Lukestaz/stock-watch/actions/runs/45797930539"
 }
