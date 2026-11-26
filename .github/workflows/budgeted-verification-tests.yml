@@ -1,0 +1,27 @@
+name: Fully composed budgeted verification tests
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'feature/multi-user-alerts']
+    paths: ['worker/migrations/**', 'worker/src/account-*.mjs', 'worker/test/account-*.test.mjs', 'tests/schema/sqlite_d1_bridge.py', '.github/workflows/budgeted-verification-tests.yml']
+  pull_request:
+    branches: [main]
+    paths: ['worker/migrations/**', 'worker/src/account-*.mjs', 'worker/test/account-*.test.mjs', 'tests/schema/sqlite_d1_bridge.py', '.github/workflows/budgeted-verification-tests.yml']
+permissions:
+  contents: read
+jobs:
+  verification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run budgeted flow and related offline verification suites
+        run: node --test worker/test/account-budgeted-verification.test.mjs worker/test/account-verification-mail.test.mjs worker/test/account-alert-destination*.test.mjs

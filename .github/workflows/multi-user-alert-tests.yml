@@ -1,0 +1,24 @@
+name: Offline multi-user alert schema tests
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'feature/multi-user-alerts']
+    paths: ['worker/migrations/**', 'worker/test/test_account_alert_schema.py', '.github/workflows/multi-user-alert-tests.yml']
+  pull_request:
+    branches: [main]
+    paths: ['worker/migrations/**', 'worker/test/test_account_alert_schema.py', '.github/workflows/multi-user-alert-tests.yml']
+permissions:
+  contents: read
+jobs:
+  schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test private alert schema in local SQLite only
+        run: python -m unittest discover -s worker/test -p test_account_alert_schema.py -v

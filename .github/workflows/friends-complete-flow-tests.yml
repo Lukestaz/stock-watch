@@ -1,0 +1,29 @@
+name: Complete friends email flow tests
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'feature/multi-user-alerts']
+    paths: ['worker/src/account-*.mjs', 'worker/test/account-*.test.mjs', 'worker/migrations/**', 'site/account-alert-settings.mjs', 'tests/schema/sqlite_d1_bridge.py', '.github/workflows/friends-complete-flow-tests.yml']
+  pull_request:
+    branches: [main]
+    paths: ['worker/src/account-*.mjs', 'worker/test/account-*.test.mjs', 'worker/migrations/**', 'site/account-alert-settings.mjs', 'tests/schema/sqlite_d1_bridge.py', '.github/workflows/friends-complete-flow-tests.yml']
+permissions:
+  contents: read
+jobs:
+  complete-flow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run complete friends flow with real application modules and fake provider sockets
+        run: node --test worker/test/account-friends-flow.test.mjs
+      - name: Run all account regression suites
+        run: node --test worker/test/account-*.test.mjs

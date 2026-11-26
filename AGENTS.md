@@ -6,6 +6,8 @@ For automated outcomes, read docs/automation-outcomes.md. The existing ci-result
 
 For the browser-test batch, read docs/simplicity-browser-status.md and ci-results:simplicity-browser/latest.json. Keep browser-job outcomes separate from the Simplicity unit/feed verification job. Test implementation and syntax checks do not establish browser execution or a passing workflow.
 
+For the friends email-alert work, read docs/friends-alerts-status.md. It is a branch handover covering what is committed and tested, not what is deployed or enabled; the friends flags default off. Check the branch, commit and latest check results before relying on it.
+
 ## Outcome records
 
 At meaningful checkpoints, update the relevant status document with what changed, verification evidence and its provenance, known limitations, pending migrations/deployments, and concrete next steps. Keep committed, tested, deployed and enabled states separate. Do not rely on chat history as the only handover. Never invent CI run IDs or claim an entire workflow passed from one step's output.
