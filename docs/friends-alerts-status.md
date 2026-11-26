@@ -1,12 +1,13 @@
 # Friends email alerts: current status
 
-Checkpoint: 2026-11-26 NZDT. This is a repository handover, not proof of production health. Verify the branch, commit and latest checks before relying on it.
+Checkpoint: 2026-11-27 NZDT (previous checkpoint 2026-11-26). This is a repository handover, not proof of production health. Verify the branch, commit and latest checks before relying on it.
 
 ## Revisions
 
 - Draft PR #4 (`feature/multi-user-alerts`), head `06cd935`: the original work. Unmerged and unchanged.
-- Draft PR #7 (`feat/friends-alerts-integration` into `main`): integration of PR #4 onto current main. Branch created from main `8b326d2`; the PR base later reported `20529aa`. Last code head: `38291b8`. Documentation commits after it do not change code.
+- Draft PR #7 (`feat/friends-alerts-integration` into `main`): integration of PR #4 onto current main. Branch created from main `8b326d2`; the PR base later reported `20529aa` and is now main `30aa076`, which includes the squash merge of PR #8 (Simplicity CloudFront feeds). Head `a5f3dbb` is the branch after main was merged into it on 2026-11-26 with no conflict. Last friends code head: `38291b8`. I did not diff `38291b8` against `a5f3dbb`, so the absence of friends code changes in the main merge is inferred. Documentation commits after `a5f3dbb`, including the one that added the PR #4 worker documents, do not change code.
 - Capacity-full feedback: API and store changes in `692a6dc`; client change, new tests and status edits in `38291b8`.
+- PR #4 worker documents: 14 files copied verbatim from `06cd935` (see below).
 
 ## Observed facts
 
@@ -18,8 +19,10 @@ Checkpoint: 2026-11-26 NZDT. This is a repository handover, not proof of product
 | Friends `worker/src` modules, the three UI files, all 18 friends test files, the 12 friends workflows and the staging build script matched PR #4 by git blob SHA when compared. `account-alert-consent-api.mjs`, `account-alert-store.mjs`, `site/account-friends-email.mjs` and `account-symbol-capacity.test.mjs` have since been edited for capacity-full feedback and no longer match. | GitHub connector, compared after each push. |
 | `worker/src/account-runtime.mjs` and `worker/test/account-runtime-friends-integration.test.mjs` are hand-written and not copies. | Reviewed from the commit diff `a849bac`. |
 | CI on PR #7: at `9aaf5b9`, `692a6dc` and `38291b8`, each head showed 16 checks succeeded, 1 failed (`verify`) and 2 `publish-summary` jobs skipped (they run only on pushes to main). | GitHub check runs read through the connector on 2026-11-26. For `9aaf5b9` and `692a6dc` the commit was inferred from the PR head and run start times; for `38291b8` the PR head was confirmed after the runs appeared. |
-| In the `adapter` job at `38291b8` (step `node --test worker/test/account-*.test.mjs`, from `account-store-tests.yml`), the six new tests in `account-capacity-feedback.test.mjs` (numbered 101 to 106) and the five new diagnosis tests in `account-symbol-capacity.test.mjs` (numbered 255 to 259) reported `ok`. | Log output pasted by the repository owner on 2026-11-26 and searched by me. The TAP summary totals (`# pass`, `# fail`) were not found in my searches, so totals are not recorded. The job concluded success. |
-| `verify` belongs to "Simplicity feed diagnostics" (workflow run #29 at `38291b8`, failed in 49s; the run is identified by timing and duration, since the log does not name the commit). Its feeds step (`node scripts/simplicity-outcomes.mjs feeds`) exited 1 because all 10 series returned HTTP 404 with `text/html` and `bytesRead` 0: six KiwiSaver (high-growth, growth, balanced, default, conservative, defensive) and four Investment (high-growth, growth, balanced, conservative). Output from an earlier run showed 9 of 10 feeds as HTTP 404 HTML and one timeout. | Step output pasted by the repository owner on 2026-11-26 for run #29; the earlier output was also owner-supplied. The names of the steps before it and the text of the run's one warning annotation were not seen. The step reads Simplicity feeds and does not exercise friends code (inferred from its name and output). The owner states the feed is being fixed at source (owner-supplied, not independently verified); as of run #29 it was not yet fixed. |
+| CI on PR #7 at `a5f3dbb`: all 19 checks completed, 17 succeeded, 2 `publish-summary` jobs skipped, none failed. `verify` and `browser-tests` are among those that succeeded. | GitHub check runs read through the connector at 23:13 and 23:21 NZDT on 2026-11-26. Runs are attributed to `a5f3dbb` from the PR head and start times, not from a SHA in the check data. Job logs were not read, so there are no test counts. Checks for the later documentation commit have not been read. |
+| In the `adapter` job at `38291b8` (step `node --test worker/test/account-*.test.mjs`, from `account-store-tests.yml`), the six new tests in `account-capacity-feedback.test.mjs` (numbered 101 to 106) and the five new diagnosis tests in `account-symbol-capacity.test.mjs` (numbered 255 to 259) reported `ok`. | Log output pasted by the repository owner on 2026-11-26 and searched by me. The TAP summary totals (`# pass`, `# fail`) were not found in my searches, so totals are not recorded. The job concluded success. The equivalent log at `a5f3dbb` was not read. |
+| `verify` belongs to "Simplicity feed diagnostics". At `38291b8` (workflow run #29, failed in 49s; the run is identified by timing and duration, since the log does not name the commit) its feeds step (`node scripts/simplicity-outcomes.mjs feeds`) exited 1 because all 10 series returned HTTP 404 with `text/html` and `bytesRead` 0: six KiwiSaver (high-growth, growth, balanced, default, conservative, defensive) and four Investment (high-growth, growth, balanced, conservative). Output from an earlier run showed 9 of 10 feeds as HTTP 404 HTML and one timeout. | Step output pasted by the repository owner on 2026-11-26 for run #29; the earlier output was also owner-supplied. The names of the steps before it and the text of the run's one warning annotation were not seen. The step reads Simplicity feeds and does not exercise friends code (inferred from its name and output). |
+| `verify` passes at `a5f3dbb`. Main now contains PR #8 (squash `30aa076`), which moves the feeds to the published CloudFront links. That the merge is the reason `verify` now passes is an inference; the log was not read. | GitHub check runs, as above, plus the PR #8 merge recorded in the repository. |
 | `verify` also failed on draft PR #6 on 2026-11-24, before the integration work. | GitHub check runs. |
 
 ## What is implemented (committed, not deployed)
@@ -40,15 +43,15 @@ Tests use local SQLite with the full migration chain, fake SMTP sockets, seeded 
 | State | Status |
 |---|---|
 | Committed | Yes, on PR #7's branch. |
-| CI-tested | Partly: friends workflows pass at `38291b8`, including the new capacity-full tests in the `adapter` job (owner-supplied log). `verify` fails on the external feed step. |
-| Merged | No. |
+| CI-tested | Partly: all 19 checks completed with none failed at `a5f3dbb`, including `verify`. The capacity-full tests are evidenced as `ok` only by the owner-supplied `adapter` log at `38291b8`; job logs at `a5f3dbb` were not read. |
+| Merged | No. PR #7 is a draft. (PR #8 is merged into main separately.) |
 | Deployed | No code from this work. |
 | Enabled | Not as far as this repository shows. The friends flags default off and are not set in repository configuration. Deployed bindings were not inspected. |
 
 ## Unknown
 
 - Whether Worker bindings, secrets, flags or any cron trigger exist in production. The health endpoint could not be fetched through the review tool on 2026-11-26.
-- Whether production's own Simplicity refresh is affected by the feed problem.
+- Whether production's own Simplicity refresh was affected by the feed problem, and whether it is healthy now.
 - Real delivery, quota behaviour and entitlement limits for Gmail and the market-data provider.
 
 ## Decisions recorded
@@ -59,10 +62,16 @@ Tests use local SQLite with the full migration chain, fake SMTP sockets, seeded 
 - A failing check is not weakened or skipped to obtain a pass.
 - The capacity message must not imply an account's own count, because the limit counts distinct symbols across all accounts.
 
+## PR #4 worker documents
+
+These 14 files were copied verbatim from PR #4 (`feature/multi-user-alerts` at `06cd935`) into `worker/`. Ten other PR #4 documents were already on this branch with matching blob SHAs. The copied files describe PR #4 as it was written, including earlier states. Where they conflict with this document, this document governs.
+
+`ACCOUNT_ALERT_PRODUCER.md`, `ACCOUNT_EMAIL_DISPATCH.md`, `ALERT_DESTINATION_API.md`, `ALERT_DESTINATION_INTEGRATION.md`, `ALERT_DESTINATION_STORE.md`, `BUDGETED_VERIFICATION.md`, `FRIENDS_FLOW_INTEGRATION.md`, `FRIENDS_RUNTIME.md`, `FRIENDS_UI_RELEASE.md`, `GMAIL_VERIFICATION_SERVICE.md`, `MULTI_USER_ALERTS.md`, `SYMBOL_CAPACITY.md`, `VERIFICATION_MAIL.md`, `VERIFICATION_PREVIEW.md`.
+
 ## Known gaps
 
 - Capacity-full feedback passes its tests in local SQLite and fake DOM conditions. It has not been exercised against real D1 or in a real browser. The diagnosis runs after a failed write, so a slot freed in between can produce the generic conflict message instead.
-- The original PR #4 worker documents are not yet copied to this branch. Some describe earlier states as unwired, and `SYMBOL_CAPACITY.md` describes capacity refusals as generic conflicts; this document supersedes them where they conflict.
+- `SYMBOL_CAPACITY.md` (copied from PR #4) still describes capacity refusals as generic conflicts. Capacity-full feedback supersedes that. Other copied documents describe earlier states as unwired; `FRIENDS_RUNTIME.md` and `FRIENDS_UI_RELEASE.md` describe the wired default-off state.
 - `migrate-production-friends-schema.yml` on main asserts a baseline of only migrations `0001` to `0004` and pins an old revision. Production already has all 11, so its preflight would fail. It is stale and should be retired in a separate change.
 - Event and outbox history retention policy is not defined.
 - Gmail and market-data usage is not counted against legacy jobs sharing the same accounts.
@@ -71,7 +80,7 @@ Tests use local SQLite with the full migration chain, fake SMTP sockets, seeded 
 
 Each needs separate, action-specific approval. Passing CI is not enough.
 
-1. Resolve `verify` or document it as external and accepted.
+1. `verify` passes at `a5f3dbb` (log not read; the likely cause is main's PR #8 fix, which is inferred). Confirm from the log if this gate is relied on.
 2. Provision separate staging resources (origin, Google client, D1 database, Worker, rate-limit namespace). The build helper refuses production identifiers.
 3. Provision Worker bindings and secrets securely. Do not paste credentials into chat or the repository.
 4. Run a staged two-account journey: sign in, verify email, opt in, receive a scheduled alert, opt out, and confirm no cross-account leakage.
@@ -80,6 +89,7 @@ Each needs separate, action-specific approval. Passing CI is not enough.
 
 ## Next steps
 
-1. Copy the PR #4 documents or reference them from this one.
+1. Done in this documentation commit: the PR #4 worker documents are copied.
 2. Link this document from `AGENTS.md`.
 3. Retire the stale production migration workflow separately.
+4. Read the checks for the documentation commit and update the PR #7 description, which still says the copied documents are missing.
