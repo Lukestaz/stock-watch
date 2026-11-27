@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: 'Type DEPLOY stock-watch-app e977e9e ALERTS-OFF'
+        description: 'Type DEPLOY stock-watch-app ca948d2 ALERTS-OFF'
         required: true
         type: string
 permissions:
@@ -17,19 +17,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      RELEASE_SHA: e977e9e0dcb44708fa9cdf1199ce69a8ea6e02a6
+      RELEASE_SHA: ca948d28e35064861addcfec177d2284c17a870b
       APP_URL: https://stock-watch-app.lukestaz.workers.dev
       WRANGLER_SEND_METRICS: 'false'
     steps:
       - name: Require exact manual deployment confirmation
         env:
           CONFIRMATION: ${{ inputs.confirmation }}
-        run: test "$CONFIRMATION" = 'DEPLOY stock-watch-app e977e9e ALERTS-OFF'
+        run: test "$CONFIRMATION" = 'DEPLOY stock-watch-app ca948d2 ALERTS-OFF'
       - name: Initialize runner build path
         run: echo "APP_DIR=$RUNNER_TEMP/stock-watch-app-release" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
         with:
-          ref: e977e9e0dcb44708fa9cdf1199ce69a8ea6e02a6
+          ref: ca948d28e35064861addcfec177d2284c17a870b
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
