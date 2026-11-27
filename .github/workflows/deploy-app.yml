@@ -144,6 +144,7 @@ jobs:
           assert.ok(passed,'Postdeployment health mismatch. No automatic rollback was performed.');
           for(const path of ['/','/account-signin.js','/account-alert-settings.mjs','/account-friends-email.mjs'])assert.ok((await get(path)).ok,'Asset unavailable: '+path);
           for(const path of ['/api/v1/alert-destination/email','/api/v1/alert-destination/email/verify','/api/v1/alert-consent/email'])assert.equal((await get(path)).status,503,'Alert route unexpectedly enabled');
-          assert.equal((await get('/api/v1/watchlist')).status,401);
+          assert.equal((await get('/api/v1/watchlist')).status,403,'Bare unauthenticated request must be refused by the origin check');
+          assert.equal((await fetch(process.env.APP_URL+'/api/v1/watchlist',{headers:{'Sec-Fetch-Site':'same-origin'},redirect:'error',signal:AbortSignal.timeout(20000)})).status,401,'Same-origin unauthenticated request must return 401');
           appendFileSync(process.env.GITHUB_STEP_SUMMARY,'Deployed and verified '+process.env.RELEASE_SHA+' to stock-watch-app. Existing migrated D1 retained. Verification, enrolment and schedule flags false; app cron empty. No migrations, provider-secret changes or email sends. Automatic app deployment is paused pending a reviewed release policy. This is validation bootstrap, not usable-alert activation.\n');
           JS
