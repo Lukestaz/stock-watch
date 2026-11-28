@@ -1,0 +1,37 @@
+name: Simplicity HTTP request comparison
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/simplicity-http-compare.yml'
+      - 'scripts/simplicity-http-compare.mjs'
+      - 'worker/test/simplicity-http-compare.test.mjs'
+permissions:
+  contents: read
+jobs:
+  compare-one-feed:
+    if: github.repository == 'Lukestaz/stock-watch' && github.event.pull_request.number == 6
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test comparison harness without network access
+        run: node --test worker/test/simplicity-http-compare.test.mjs
+      - name: Compare three requests for Investment High Growth
+        env:
+          REPORT_FILE: ${{ runner.temp }}/simplicity-http-compare.json
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/simplicity-http-compare.mjs
+      - name: Preserve bounded public HTTP comparison evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: simplicity-http-compare-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/simplicity-http-compare.json
+          retention-days: 7
+          if-no-files-found: error

@@ -1,0 +1,135 @@
+name: Simplicity public production preflight
+on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/simplicity-public-preflight.yml']
+permissions:
+  contents: read
+jobs:
+  public-preflight:
+    if: github.repository == 'Lukestaz/stock-watch' && github.event.pull_request.number == 6 && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      summary: ${{ steps.inspect.outputs.summary }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: a53edf3261045028cf0cb91f8536914da45f2296
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Inspect public health, assets and fund responses without deployment
+        id: inspect
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPORT_FILE: ${{ runner.temp }}/simplicity-public-preflight.json
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { writeFileSync, appendFileSync } from 'node:fs';
+          import { createHash } from 'node:crypto';
+          import { validateFundView } from './site/simplicity-view.mjs';
+          const app = 'https://stock-watch-app.lukestaz.workers.dev';
+          const report = {
+            scope: 'public-production-preflight-only',
+            checkedAt: new Date().toISOString(),
+            runId: process.env.GITHUB_RUN_ID,
+            headSha: process.env.HEAD_SHA,
+            validatorSha: 'a53edf3261045028cf0cb91f8536914da45f2296',
+            checks: [], health: null, funds: [], assets: [],
+            providerSettingsInspected: false, deploymentAttempted: false,
+            limitation: 'Public health cannot verify provider bindings, schedules or secret settings. Fund GETs may refresh D1 and increment rate-limit counters. This report is not release approval.'
+          };
+          async function read(path, headers = {}) {
+            const response = await fetch(app + path, {
+              method: 'GET', headers, credentials: 'omit', redirect: 'error',
+              signal: AbortSignal.timeout(20000)
+            });
+            const reader = response.body?.getReader();
+            const decoder = new TextDecoder('utf-8', { fatal: true });
+            let text = '', bytes = 0;
+            if (reader) try {
+              while (true) {
+                const part = await reader.read();
+                if (part.done) break;
+                bytes += part.value.byteLength;
+                if (bytes > 2000000) throw Error('Response limit');
+                text += decoder.decode(part.value, { stream: true });
+              }
+              text += decoder.decode();
+            } finally {
+              try { await reader.cancel(); } catch {}
+              reader.releaseLock();
+            }
+            return { status: response.status, text, contentType: response.headers.get('content-type') || '' };
+          }
+          async function check(name, run) {
+            try { await run(); report.checks.push({ name, passed: true }); }
+            catch { report.checks.push({ name, passed: false }); }
+          }
+          await check('live-build-and-database-health', async () => {
+            const r = await read('/api/health'), h = JSON.parse(r.text);
+            report.health = {
+              status: r.status,
+              build: /^[a-f0-9]{40}$/.test(h.build) ? h.build : null,
+              ok: h.ok === true, accountPreview: h.mode === 'account-preview',
+              databaseBound: h.database?.bound === true,
+              databaseReady: h.database?.ready === true,
+              optionalAlertFlagsOff: h.friendsAlerts === undefined ? null :
+                ['verificationReady', 'enrollmentAvailable', 'scheduledConfigured'].every(k => h.friendsAlerts?.[k] === false)
+            };
+            assert.equal(r.status, 200);
+            assert.ok(report.health.build);
+            for (const k of ['ok', 'accountPreview', 'databaseBound', 'databaseReady']) assert.equal(report.health[k], true);
+            assert.notEqual(report.health.optionalAlertFlagsOff, false);
+          });
+          for (const file of ['simplicity.js', 'simplicity-view.mjs']) {
+            await check('asset-' + file, async () => {
+              const r = await read('/' + file);
+              assert.equal(r.status, 200);
+              assert.ok(r.text.length && !/html/i.test(r.contentType));
+              report.assets.push({ file, sha256: createHash('sha256').update(r.text).digest('hex') });
+            });
+          }
+          for (const series of ['simplicity:kiwisaver:high-growth', 'simplicity:investment:high-growth']) {
+            await check('fund-' + series, async () => {
+              const r = await read('/api/v1/fund?series=' + encodeURIComponent(series), { Origin: app, 'Sec-Fetch-Site': 'same-origin' });
+              const entry = { seriesId: series, status: r.status };
+              report.funds.push(entry);
+              const body = JSON.parse(r.text);
+              if (['cached', 'refreshed', 'stale', 'unavailable'].includes(body.cache?.state)) entry.cacheState = body.cache.state;
+              if (['backoff', 'refresh-failed', 'refresh-in-progress', 'lease-lost'].includes(body.cache?.reason)) entry.reason = body.cache.reason;
+              assert.equal(r.status, 200);
+              const value = validateFundView(body, series);
+              assert.equal(value.snapshot.identityVerified, false);
+              assert.equal(value.snapshot.alertEligible, false);
+              entry.asOfDate = value.snapshot.asOfDate;
+              entry.fetchedAt = value.snapshot.fetchedAt;
+            });
+          }
+          report.outcome = report.checks.every(c => c.passed) ? 'passed' : 'failed';
+          writeFileSync(process.env.REPORT_FILE, JSON.stringify(report, null, 2) + '\n');
+          for (const c of report.checks) console.log(c.name + ': ' + (c.passed ? 'PASS' : 'FAIL'));
+          const healthPassed = report.checks.find(c => c.name === 'live-build-and-database-health')?.passed === true;
+          const statuses = report.funds.map(f => f.status).join('/') || 'unknown';
+          appendFileSync(process.env.GITHUB_OUTPUT, 'summary=Health ' + (healthPassed ? 'PASS' : 'FAIL') + ' build ' + (report.health?.build || 'unknown') + ' funds ' + statuses + '\n');
+          if (report.outcome !== 'passed') process.exitCode = 1;
+          JS
+      - name: Retain bounded public preflight report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: simplicity-public-preflight-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/simplicity-public-preflight.json
+          retention-days: 7
+          if-no-files-found: error
+  public-result:
+    needs: public-preflight
+    if: ${{ always() && !cancelled() && needs.public-preflight.result != 'skipped' }}
+    name: ${{ needs.public-preflight.outputs.summary || 'Public preflight report unavailable' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - run: echo 'See public-preflight check and its artifact for results; this reporting job does not approve deployment.'

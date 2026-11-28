@@ -24,3 +24,60 @@ export function chartPoints(rows) {
   const low = Math.min(...prices), height = Math.max(...prices) - low || 1;
   return rows.map((row, i) => `${(20 + 760 * (times[i] - first) / span).toFixed(2)},${(220 - 200 * (row.price - low) / height).toFixed(2)}`).join(' ');
 }
+
+export function publicationLabel(freshness) {
+  switch (freshness) {
+    case 'current':
+    case 'fresh': return 'Meets the configured expected date; latest publication not independently verified';
+    case 'stale': return 'Behind the configured expected date';
+    case 'future-dated': return 'Future-dated observation; source needs review';
+    default: return 'Not independently verified';
+  }
+}
+
+export function publicationContext(snapshot, cache) {
+  const retrieved = Date.parse(snapshot?.fetchedAt);
+  const source = cache === 'stale'
+    ? 'Source refresh unavailable. Showing the last successful retrieval, not a newly downloaded valuation.'
+    : cache === 'cached'
+      ? 'Showing D1-cached data. Refreshing the page does not necessarily download the CSV again.'
+      : 'A successful retrieval does not prove that a newer valuation has been published.';
+  return {
+    publication: publicationLabel(snapshot?.freshness),
+    source,
+    retrieved: Number.isFinite(retrieved)
+      ? new Date(retrieved).toLocaleString('en-NZ', {timeZone: 'Pacific/Auckland'}) + ' (NZ time)'
+      : 'Unavailable',
+    warning: cache === 'stale' || ['stale', 'future-dated'].includes(snapshot?.freshness),
+    estimateAvailable: false
+  };
+}
+
+export function renderFundContext(result, snapshot, cache) {
+  const doc = result.ownerDocument, model = publicationContext(snapshot, cache);
+  let panel = result.querySelector('#publication-context');
+  if (!panel) {
+    panel = doc.createElement('section');
+    panel.id = 'publication-context';
+    panel.className = 'panel';
+    panel.setAttribute('aria-labelledby', 'publication-heading');
+    result.insertBefore(panel, result.children[1] || null);
+  }
+  panel.replaceChildren();
+  const add = (parent, tag, text, className) => {
+    const element = doc.createElement(tag);
+    element.textContent = text;
+    if (className) element.className = className;
+    parent.append(element);
+    return element;
+  };
+  add(panel, 'h2', 'Published price timing').id = 'publication-heading';
+  add(panel, 'p', 'Publication status: ' + model.publication + '.', model.warning ? 'warning' : 'muted');
+  add(panel, 'p', 'Unit prices normally have a two-working-day publication delay. Weekends and holidays can affect the calendar gap. The exact CSV update time and holiday policy have not been verified.');
+  add(panel, 'p', model.source, cache === 'stale' ? 'warning' : 'muted');
+  add(panel, 'p', 'Source retrieved: ' + model.retrieved, 'muted');
+  add(panel, 'h3', 'Estimated unpublished price');
+  add(panel, 'p', 'Unavailable — no estimated price is currently calculated or plotted.', 'muted');
+  add(panel, 'p', 'Numerical estimates are withheld until fund-specific allocations, currency hedging, market-data proxies and valuation cutoffs have been validated.', 'muted');
+  add(panel, 'p', 'Any future estimate will be labelled separately from published prices and will not be an executable switch price. Official history remains unchanged.', 'muted');
+}
